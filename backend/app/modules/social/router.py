@@ -1,4 +1,6 @@
 """Buddy routes (docs/API.md, Module 4)."""
+import re
+
 from fastapi import APIRouter, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
@@ -8,7 +10,7 @@ from ...platform.auth import CurrentUser, User
 from ...platform.http import UUID_RE, err, ok, parse, read_json
 from ...platform.rate_limit import limited, rules
 from ...platform.security import client_ip
-from . import service
+from . import people, service
 
 router = APIRouter(prefix="/api/v1")
 
@@ -27,7 +29,9 @@ async def lookup(req: Request, handle: str | None = None, email: str | None = No
 
 
 class InviteBody(BaseModel):
-    selectedMoveId: str = Field(pattern=UUID_RE)
+    """Invite onto a selected move, or onto one piece of past-work evidence (exactly one of the two)."""
+    selectedMoveId: str | None = Field(default=None, pattern=UUID_RE)
+    evidenceId: str | None = Field(default=None, pattern=UUID_RE)
     buddy: str = Field(min_length=3, max_length=254)
     role: str = Field(pattern=r"^(reviewer|tester)$")
     message: str | None = Field(default=None, max_length=500)
@@ -40,8 +44,10 @@ async def invite(req: Request, user: CurrentUser = User):
     p = parse(InviteBody, await read_json(req, 4096))
     if isinstance(p, JSONResponse):
         return p
+    if bool(p.selectedMoveId) == bool(p.evidenceId):
+        return err("Send selectedMoveId or evidenceId.")
     try:
-        inv = await service.invite(user.id, p.selectedMoveId, p.buddy, p.role, p.message)
+        inv = await service.invite(user.id, p.selectedMoveId, p.buddy, p.role, p.message, evidence_id=p.evidenceId)
     except service.SocialError as e:
         return _e(e)
     return JSONResponse(ok(invitation=jsonable_encoder(inv)), status_code=201)
@@ -88,9 +94,77 @@ async def queue(user: CurrentUser = User):
     return ok(queue=jsonable_encoder(await service.review_queue(user.id)))
 
 
+@router.get("/evidence/{evidence_id}/feedback")
+async def evidence_feedback(evidence_id: str, user: CurrentUser = User):
+    if not re.fullmatch(UUID_RE, evidence_id):
+        return err("not found", 404)
+    try:
+        return ok(**jsonable_encoder(await service.feedback_for_evidence(user.id, evidence_id)))
+    except service.SocialError as e:
+        return _e(e)
+
+
 @router.get("/selected-moves/{sm_id}/feedback")
 async def move_feedback(sm_id: str, user: CurrentUser = User):
     try:
         return ok(**jsonable_encoder(await service.feedback_for_move(user.id, sm_id)))
+    except service.SocialError as e:
+        return _e(e)
+
+
+# ---- People directory and connections (D-54) ----------------------------------------------------------------------
+@router.get("/people")
+async def search_people(req: Request, q: str = "", user: CurrentUser = User):
+    if rl := limited((rules.lookup_ip, client_ip(req)), (rules.lookup_user, user.id)):
+        return rl
+    if len(q) > 80:
+        return err("Search text is too long.")
+    try:
+        return ok(people=await people.search(user.id, q))
+    except service.SocialError as e:
+        return _e(e)
+
+
+@router.get("/people/{handle}")
+async def person(handle: str, user: CurrentUser = User):
+    if not re.fullmatch(r"@?[A-Za-z0-9_]{3,24}", handle):
+        return err("No one with that handle.", 404)
+    try:
+        return ok(person=jsonable_encoder(await people.profile(user.id, handle)))
+    except service.SocialError as e:
+        return _e(e)
+
+
+class ConnectBody(BaseModel):
+    handle: str = Field(pattern=r"^@?[A-Za-z0-9_]{3,24}$")
+
+
+@router.get("/connections")
+async def list_connections(user: CurrentUser = User):
+    try:
+        return ok(**jsonable_encoder(await people.list_connections(user.id)))
+    except service.SocialError as e:
+        return _e(e)
+
+
+@router.post("/connections")
+async def connect(req: Request, user: CurrentUser = User):
+    if rl := limited((rules.write_ip, client_ip(req))):
+        return rl
+    p = parse(ConnectBody, await read_json(req, 1024))
+    if isinstance(p, JSONResponse):
+        return p
+    try:
+        return JSONResponse(ok(connection=await people.connect(user.id, p.handle)), status_code=201)
+    except service.SocialError as e:
+        return _e(e)
+
+
+@router.post("/connections/{conn_id}/{action}")
+async def respond_connection(conn_id: str, action: str, user: CurrentUser = User):
+    if action not in ("accept", "decline", "remove") or not re.fullmatch(UUID_RE, conn_id):
+        return err("not found", 404)
+    try:
+        return ok(connection=await people.respond(user.id, conn_id, action))
     except service.SocialError as e:
         return _e(e)

@@ -1,6 +1,6 @@
 /* Components in the Event_Ecosystem design (docs/DESIGN.md). Colours come from tokens.css only. */
 import { Link } from "react-router";
-import { useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
 import type { Category, Tier } from "@/lib/types";
 
 export function Panel({ children, className = "", id }: { children: ReactNode; className?: string; id?: string }) {
@@ -185,5 +185,38 @@ export function ErrorNote({ children, onRetry }: { children: ReactNode; onRetry?
       <span>{children}</span>
       {onRetry && <Button kind="text" onClick={onRetry}>Try again</Button>}
     </div>
+  );
+}
+
+/** A centred dialog (native <dialog>: focus trap, Esc to close, backdrop click closes). */
+export function Modal({ open, onClose, title, sub, children }: { open: boolean; onClose: () => void; title: ReactNode; sub?: ReactNode; children: ReactNode }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const d = ref.current;
+    if (!d) return;
+    // jsdom (tests) has no showModal/close, so fall back to the open attribute there.
+    if (open && !d.open) {
+      if (d.showModal) d.showModal(); else d.setAttribute("open", "");
+    }
+    if (!open && d.open) {
+      if (d.close) d.close(); else d.removeAttribute("open");
+    }
+  }, [open]);
+  return (
+    <dialog ref={ref} aria-labelledby="modal-title" onClose={onClose} onClick={(e) => { if (e.target === ref.current) onClose(); }}
+      className="m-auto w-[min(560px,calc(100vw-32px))] rounded-xl border border-border bg-panel p-0 text-text backdrop:bg-black/40">
+      {open && (
+        <div className="flex max-h-[85vh] flex-col gap-4 overflow-y-auto px-6 pb-6 pt-5">
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <h2 id="modal-title" className="text-xl font-bold text-primary">{title}</h2>
+              {sub && <div className="text-sm text-secondary">{sub}</div>}
+            </div>
+            <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg px-2 text-2xl leading-none text-secondary hover:text-text">×</button>
+          </div>
+          {children}
+        </div>
+      )}
+    </dialog>
   );
 }

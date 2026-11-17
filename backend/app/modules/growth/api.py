@@ -62,8 +62,8 @@ async def evidence_for_review(evidence_id: str) -> dict | None:
     return await service.get_evidence("", evidence_id, viewer_is_buddy=True)
 
 
-async def evidence_owner(evidence_id: str) -> tuple[str, str] | None:
-    """(owner user id, selected move id)."""
+async def evidence_owner(evidence_id: str) -> tuple[str, str | None] | None:
+    """(owner user id, selected move id, or None for past-work evidence)."""
     return await service.owner_of(evidence_id)
 
 
@@ -73,6 +73,11 @@ async def evidence_file_url(evidence_id: str) -> str | None:
 
 async def list_evidence(user_id: str, selected_move_id: str | None = None) -> list[dict]:
     return await service.list_evidence(user_id, selected_move_id)
+
+
+async def get_own_evidence(user_id: str, evidence_id: str) -> dict | None:
+    """One piece of evidence if user_id owns it (public shape, with selectedMoveId and wishId)."""
+    return await service.get_evidence(user_id, evidence_id)
 
 
 async def is_validated_evidence(user_id: str, evidence_id: str) -> bool:

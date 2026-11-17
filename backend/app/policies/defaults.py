@@ -101,6 +101,10 @@ POLICIES: tuple[PolicyDef, ...] = (
     P("BUDDY_DISCOVERY", "D-35", "social", "Michael Hawes", "choice", "exact",
       "Find buddies by typing the exact handle or email, or search (mike-branch original): results appear as you "
       "type, matching anywhere in the handle, up to 20, each with an Invite button.", ("exact", "search"), public=True),
+    P("PEOPLE_DIRECTORY", "D-54", "social", "Michael Hawes", "choice", "on",
+      "People search and public profiles (impact score, tiers, badges, unlocks, featured contributions; never email, "
+      "evidence or the points ledger) for signed-in users, and connections between them. off hides all of it.",
+      ("on", "off"), public=True),
     P("REVIEWER_EARNS", "D-37", "social", "Michael Hawes", "choice", "none",
       "Reviewing someone else earns nothing, or effort points.", ("none", "effort"), public=True),
     # Module 5: Opportunity & Event Return (JBarroqu)
@@ -108,7 +112,7 @@ POLICIES: tuple[PolicyDef, ...] = (
       "Notification kinds that are switched off.",
       allowed_items=("move_locked", "next_move_ready", "evidence_scored", "evidence_validated", "evidence_needs_work",
                      "tier_reached", "unlock_granted", "buddy_invited", "buddy_accepted", "buddy_declined",
-                     "feedback_received", "profile_completed")),
+                     "feedback_received", "profile_completed", "connection_requested", "connection_accepted")),
     P("WYWA_MODE", "D-39", "feed", "JBarroqu", "choice", "since_last_visit",
       "While You Were Away shows items since the previous visit, or from the last 7 days.",
       ("since_last_visit", "days:7"), public=True),

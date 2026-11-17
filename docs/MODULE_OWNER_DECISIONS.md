@@ -240,6 +240,11 @@ Your 14 tests are ported.
 - **Now:** reviewing someone else doesn't earn points. Should it? (Q3 below.)
 - **Setting:** `REVIEWER_EARNS` = **none** | effort
 
+### D-54 People directory and connections (new)
+- **Now:** the header search finds people by name or handle. Each person has a profile page with their Impact Score, role tier, skill tiers, earned badges, unlocked opportunities and featured contributions. Email, evidence and the points ledger are never shown. People can send a connection request; the other person accepts or declines in Buddies, Connections.
+- **Setting:** `PEOPLE_DIRECTORY` = **on** | off (off hides search, profiles and connections)
+- **Note:** this is separate from `BUDDY_DISCOVERY` (D-35), which still controls how you find someone when inviting a buddy to a move.
+
 ### Re-invite after a decline
 - **Before and now:** you can't re-invite the same person to the same move, even after they decline. Kept as you built it.
 - **Setting:** `REINVITE_AFTER_DECLINE` = **false** | true
@@ -319,3 +324,4 @@ The app runs with the default in the last column until an owner answers.
 | 2026-11-06 | D-35, D-50, D-46, D-11, D-45, D-01 | Each alternative now restores the original behaviour end to end, not just in the backend: buddy search as you type (`search` replaces `prefix`, which matched differently from the original), the original Opportunity chip, the full survey, user-chosen tags, the "Add to profile" offer and the Home reminder. Defaults unchanged. | Waleed |
 | 2026-11-09 | D-02 | `MOVES_PER_WISH` back to 1 after it was set to 3 on 2026-11-07. A wish holds several moves either way; 1 generates each after the last, so a dropped move costs one regeneration, and the next move follows how the last one went. | Waleed |
 | 2026-11-09 | D-03 | `NEXT_MOVE_GATE` default from validated to submitted: the next move opens once evidence is submitted. Validation still decides points, tiers and unlocks; it no longer holds up the path. | Waleed |
+| 2026-11-17 | D-54 | New: people directory, public profiles and connections (`PEOPLE_DIRECTORY`, default on). Also: evidence can be past work logged against a wish (no move status change, own reviewer invite); locked opportunities carry a how-to-unlock plan (GrowthState 0.2, SocialEvidence 0.2). | Christina Phan |

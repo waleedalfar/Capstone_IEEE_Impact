@@ -1,26 +1,36 @@
 /* Module 3 (owner Christina Phan): Impact Score, per-skill tiers with the gates still to meet, unlocks, badges, ledger. */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
-import { CategoryIcon, Divider, Empty, PageTitle, Panel, PanelTitle, Progress, Skeleton, SubPanel, Tag, TierBadge } from "@/components/ui";
+import { Divider, Empty, PageTitle, Panel, PanelTitle, Progress, Skeleton, SubPanel, Tag, TierBadge } from "@/components/ui";
 import { get } from "@/lib/api";
 import { useConfig } from "@/lib/config";
 import { ago, pts } from "@/lib/format";
-import type { Evidence, GrowthState } from "@/lib/types";
+import type { Evidence, GrowthState, Unlock } from "@/lib/types";
+import { BadgeIcon } from "./BadgeIcon";
+import { OpportunityDialog } from "./OpportunityDialog";
+import { OpportunityIcon } from "./OpportunityIcon";
+import { ImpactChart, type LedgerEvent } from "./ImpactChart";
+import { LogEvidenceButton } from "./LogEvidence";
 
-type Ledger = { id: string; kind: string; points: number; skillId: string | null; reason: string; createdAt: string };
+type Ledger = LedgerEvent;
 
 export default function GrowthPage() {
   const { catalog, policy } = useConfig();
   const [g, setG] = useState<GrowthState | null>(null);
   const [ev, setEv] = useState<Evidence[]>([]);
-  const [ledger, setLedger] = useState<Ledger[]>([]);
-  useEffect(() => {
+  const [ledger, setLedger] = useState<Ledger[] | null>(null);
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  const load = useCallback(() => {
     get<{ growth: GrowthState }>("/api/v1/growth").then((r) => setG(r.growth));
     get<{ evidence: Evidence[] }>("/api/v1/evidence").then((r) => setEv(r.evidence));
-    get<{ events: Ledger[] }>("/api/v1/score-events").then((r) => setLedger(r.events));
+    get<{ events: Ledger[] }>("/api/v1/score-events").then((r) => setLedger(r.events)).catch(() => setLedger([]));
   }, []);
+  useEffect(load, [load]);
   if (!g) return <div className="flex flex-col gap-3"><Skeleton className="h-8 w-1/3" /><Skeleton className="h-64 w-full" /></div>;
   const career = catalog?.careers.find((c) => c.id === g.careerId);
+  // Looked up from the latest growth state, so the pop-up updates (or flips to unlocked) after logging evidence from it.
+  const openUnlocked: Unlock | undefined = g.unlocks.find((u) => u.opportunityId === openingId);
+  const openLocked: Unlock | undefined = g.lockedOpportunities.find((u) => u.opportunityId === openingId);
   return (
     <div className="flex flex-col gap-6">
       <PageTitle sub={career ? `Tracked against ${career.name}. Scoring rules ${g.rulesVersion}.` : "Choose a target career on your profile to track skills."}>Growth</PageTitle>
@@ -31,6 +41,8 @@ export default function GrowthPage() {
             <span className="block text-xs tracking-[-0.36px] text-text">Impact Score</span>
             <span className="mt-1 block text-xs text-secondary">Validated points plus counted effort (effort is capped).</span>
           </div>
+          <ImpactChart events={ledger} impact={g.totals.impact} />
+          <LogEvidenceButton className="w-full" onLogged={load} />
           <Divider />
           <SubPanel>
             <h2 className="mb-3 text-base font-bold text-primary">Points</h2>
@@ -44,9 +56,15 @@ export default function GrowthPage() {
             {g.totals.pending > 0 && !policy("PROVISIONAL_COUNTS") && <p className="mt-3 text-xs text-secondary">Pending points count once a reviewer confirms them.</p>}
           </SubPanel>
           <SubPanel>
-            <h2 className="mb-3 text-base font-bold text-primary">Badges</h2>
+            <h2 className="mb-3 flex items-center justify-between text-base font-bold text-primary">
+              Badges<span className="text-xs font-semibold text-secondary">{g.badges.filter((b) => b.earned).length} of {g.badges.length}</span>
+            </h2>
             <ul className="grid grid-cols-2 gap-2">{g.badges.map((b) => (
-              <li key={b.id} className={`rounded-lg bg-white p-3 text-sm ${b.earned ? "" : "opacity-55"}`}><strong className="block">{b.name}</strong><span className="text-xs text-secondary">{b.earned ? b.rarity : b.description}</span></li>
+              <li key={b.id} className="flex flex-col items-center gap-2 rounded-lg bg-white px-3 pb-3 pt-4 text-center text-sm" title={b.description}>
+                <BadgeIcon id={b.id} rarity={b.rarity} earned={b.earned} />
+                <strong className={`block leading-tight ${b.earned ? "text-navy" : "text-secondary"}`}>{b.name}</strong>
+                <span className="text-xs text-secondary">{b.earned ? b.rarity : b.description}</span>
+              </li>
             ))}</ul>
           </SubPanel>
         </aside>
@@ -75,18 +93,29 @@ export default function GrowthPage() {
           <Panel id="opportunities">
             <PanelTitle count={g.unlocks.length}>Opportunities</PanelTitle>
             <ul className="flex flex-col">
-              {[...g.unlocks.map((u) => ({ ...u, on: true })), ...g.lockedOpportunities.map((u) => ({ ...u, on: false }))].map((u) => (
-                <li key={u.opportunityId} className={`flex items-center gap-4 border-b border-black px-2.5 py-3 ${u.on ? "" : "opacity-55"}`}>
-                  <CategoryIcon category="Enablement" />
-                  <span className="min-w-0 flex-1"><strong className="block font-semibold text-black">{u.title}</strong><span className="block text-secondary">{u.description}</span></span>
-                  <span className="flex shrink-0 flex-col items-end gap-1"><TierBadge tier={u.tier} /><span className="text-xs text-secondary">{u.on ? "Unlocked" : "Locked"}</span></span>
-                </li>
-              ))}
+              {[...g.unlocks.map((u) => ({ ...u, on: true })), ...g.lockedOpportunities.map((u) => ({ ...u, on: false }))].map((u) => {
+                const steps = u.howToUnlock?.steps ?? [];
+                const met = steps.filter((x) => x.met).length;
+                return (
+                  <li key={u.opportunityId} className="border-b border-black">
+                    <button type="button" onClick={() => setOpeningId(u.opportunityId)}
+                      className="flex w-full items-center gap-4 px-2.5 py-3 text-left transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-primary"
+                      aria-label={`${u.title}: ${u.on ? "unlocked" : "see how to unlock"}`}>
+                      <OpportunityIcon id={u.opportunityId} tier={u.tier} unlocked={u.on} />
+                      <span className={`min-w-0 flex-1 ${u.on ? "" : "opacity-70"}`}><strong className="block font-semibold text-black">{u.title}</strong><span className="block text-secondary">{u.description}</span></span>
+                      <span className="flex shrink-0 flex-col items-end gap-1">
+                        <TierBadge tier={u.tier} />
+                        <span className={`text-xs font-semibold ${u.on ? "text-growth" : "text-primary"}`}>{u.on ? "Unlocked" : steps.length ? `How to unlock · ${met}/${steps.length}` : "How to unlock"}</span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </Panel>
           <Panel>
-            <PanelTitle count={ev.length}>Evidence</PanelTitle>
-            {ev.length === 0 ? <Empty>No evidence yet. Do a move and show what you made.</Empty> : (
+            <PanelTitle count={ev.length} right={<LogEvidenceButton kind="secondary" onLogged={load} />}>Evidence</PanelTitle>
+            {ev.length === 0 ? <Empty>No evidence yet. Do a move, then use Log evidence to show what you made.</Empty> : (
               <ul>{ev.map((e) => (
                 <li key={e.id}><Link to={`/growth/evidence/${e.id}`} className="flex items-center gap-3 border-b border-black px-2.5 py-3 hover:bg-white">
                   <span className="min-w-0 flex-1 truncate">{e.summary}</span><Tag tone={e.status === "validated" ? "growth" : "neutral"}>{e.status.replace("_", " ")}</Tag>
@@ -100,12 +129,13 @@ export default function GrowthPage() {
             <div className="notification-list max-h-[320px] overflow-y-auto">
               <table className="w-full text-sm">
                 <thead><tr className="text-left text-xs text-secondary"><th className="py-2">When</th><th>Kind</th><th>Skill</th><th>Reason</th><th className="text-right">Points</th></tr></thead>
-                <tbody>{ledger.map((l) => <tr key={l.id} className="border-t border-subpanel"><td className="py-2 text-time">{ago(l.createdAt)}</td><td>{l.kind}</td><td>{l.skillId ?? ""}</td><td>{l.reason.replace(/_/g, " ")}</td><td className="text-right font-semibold">{pts(l.points)}</td></tr>)}</tbody>
+                <tbody>{(ledger ?? []).map((l) => <tr key={l.id} className="border-t border-subpanel"><td className="py-2 text-time">{ago(l.createdAt)}</td><td>{l.kind}</td><td>{l.skillId ?? ""}</td><td>{l.reason.replace(/_/g, " ")}</td><td className="text-right font-semibold">{pts(l.points)}</td></tr>)}</tbody>
               </table>
             </div>
           </Panel>
         </section>
       </div>
+      <OpportunityDialog op={openUnlocked ?? openLocked ?? null} unlocked={!!openUnlocked} evidence={ev} onLogged={load} onClose={() => setOpeningId(null)} />
     </div>
   );
 }

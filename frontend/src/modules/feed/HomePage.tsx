@@ -8,6 +8,8 @@ import { get, post } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { ago, pts, STATUS_LABEL } from "@/lib/format";
 import type { FeedItem, Home } from "@/lib/types";
+import { ImpactChart, type LedgerEvent } from "@/modules/growth/ImpactChart";
+import { LogEvidenceButton } from "@/modules/growth/LogEvidence";
 
 const CHIPS = ["People", "Opportunity", "Impact", "Growth", "Enablement", "Social"];
 
@@ -36,6 +38,7 @@ export default function HomePage() {
   const [unread, setUnread] = useState(0);
   const [chip, setChip] = useState("");
   const { me } = useAuth();
+  const [ledger, setLedger] = useState<LedgerEvent[] | null>(null);
 
   const loadFeed = useCallback(() => {
     const qs = new URLSearchParams();
@@ -43,7 +46,11 @@ export default function HomePage() {
     if (q) qs.set("q", q);
     get<{ items: FeedItem[]; unread: number }>(`/api/v1/feed?${qs}`).then((r) => { setItems(r.items); setUnread(r.unread); });
   }, [chip, q]);
-  useEffect(() => { get<Home>("/api/v1/home").then(setHome); }, []);
+  // /home counts as a visit (D-39), so after logging evidence only the ledger is refreshed, not Home itself.
+  const loadLedger = useCallback(() => {
+    get<{ events: LedgerEvent[] }>("/api/v1/score-events").then((r) => setLedger(r.events)).catch(() => setLedger([]));
+  }, []);
+  useEffect(() => { get<Home>("/api/v1/home").then(setHome); loadLedger(); }, [loadLedger]);
   useEffect(loadFeed, [loadFeed]);
   useEffect(() => { if (location.hash === "#notifications") document.getElementById("notifications")?.scrollIntoView({ behavior: "smooth" }); }, [items]);
 
@@ -91,6 +98,10 @@ export default function HomePage() {
             {home.profileCard.targetCareer ? `${home.profileCard.targetCareer} · ` : ""}<TierBadge tier={home.growthSummary.roleTier} />
             {home.growthSummary.pending > 0 && ` · ${pts(home.growthSummary.pending)} pending`}
           </span>}
+        </div>
+        <div className="mt-4 flex flex-col gap-3">
+          <ImpactChart events={home ? ledger : null} impact={home?.growthSummary.impact ?? 0} compact />
+          <LogEvidenceButton className="w-full" onLogged={loadLedger} />
         </div>
         <Divider />
         <SubPanel>

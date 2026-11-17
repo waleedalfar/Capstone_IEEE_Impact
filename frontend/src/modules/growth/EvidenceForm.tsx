@@ -1,5 +1,6 @@
-/* Module 3: submit evidence for a selected move. Skill, activity type and difficulty come from the move (D-11). With
-   MOVE_TAGS_SOURCE=user the form shows them as choices, starting from the move's tags (Growth-Validation original). */
+/* Module 3: submit evidence for a selected move, or past work toward a wish. For a move, skill, activity type and
+   difficulty come from the move (D-11); with MOVE_TAGS_SOURCE=user the form shows them as choices, starting from the
+   move's tags (Growth-Validation original). Past work has no move, so the user always picks them (skill required). */
 import { useRef, useState } from "react";
 import { Button, Chip, ChipRow, ErrorNote, Field, Input, Select, TextArea } from "@/components/ui";
 import { ApiError, upload } from "@/lib/api";
@@ -19,13 +20,19 @@ function afterSubmit(mode: string | undefined) {
   return "It's scored right away, then your reviewer confirms it.";
 }
 
-export function EvidenceForm({ selectedMoveId, revisionOf, tags, onSubmitted }: { selectedMoveId: string; revisionOf?: string; tags?: Tags; onSubmitted: (e: Evidence) => void }) {
+type Props = { revisionOf?: string; tags?: Tags; onSubmitted: (e: Evidence) => void } & (
+  | { selectedMoveId: string; wishId?: undefined; skillChoices?: undefined }
+  /** Past work toward a wish: skillChoices are the skills the user tracks (the server only accepts those). */
+  | { selectedMoveId?: undefined; wishId: string; skillChoices: { value: string; label: string }[] });
+
+export function EvidenceForm({ selectedMoveId, wishId, skillChoices, revisionOf, tags, onSubmitted }: Props) {
   const { policy, catalog } = useConfig();
-  const userTags = policy("MOVE_TAGS_SOURCE") === "user";
-  const [t, setT] = useState<Tags>(tags ?? { skillId: "", activityType: "create", difficulty: "moderate" });
+  const pastWork = !!wishId;
+  const userTags = pastWork || policy("MOVE_TAGS_SOURCE") === "user";
+  const [t, setT] = useState<Tags>(tags ?? { skillId: pastWork && skillChoices?.length === 1 ? skillChoices[0].value : "", activityType: "create", difficulty: "moderate" });
   const careers = catalog?.careers ?? [];
   const skills = (careers.find((c) => c.skills.some((s) => s.id === t.skillId)) ?? null)?.skills ?? careers.flatMap((c) => c.skills);
-  const skillOptions = [...(t.skillId && !skills.some((s) => s.id === t.skillId) ? [{ value: t.skillId, label: t.skillId.replace(/_/g, " ") }] : []),
+  const skillOptions = skillChoices ?? [...(t.skillId && !skills.some((s) => s.id === t.skillId) ? [{ value: t.skillId, label: t.skillId.replace(/_/g, " ") }] : []),
     ...skills.map((s) => ({ value: s.id, label: s.name }))];
   const [kind, setKind] = useState<"link" | "file" | "text">("link");
   const [url, setUrl] = useState("");
@@ -34,12 +41,13 @@ export function EvidenceForm({ selectedMoveId, revisionOf, tags, onSubmitted }: 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
-  const ready = summary.trim() && (kind !== "link" || /^https?:\/\//.test(url)) && (kind !== "file" || file);
+  const ready = summary.trim() && (kind !== "link" || /^https?:\/\//.test(url)) && (kind !== "file" || file) && (!pastWork || t.skillId);
 
   const submit = async () => {
     setBusy(true); setError(null);
     const f = new FormData();
-    f.append("selectedMoveId", selectedMoveId);
+    if (selectedMoveId) f.append("selectedMoveId", selectedMoveId);
+    if (wishId) f.append("wishId", wishId);
     f.append("artifactType", kind);
     f.append("summary", summary.trim());
     if (kind === "link") f.append("url", url.trim());
@@ -48,7 +56,7 @@ export function EvidenceForm({ selectedMoveId, revisionOf, tags, onSubmitted }: 
     if (userTags) { f.append("skillId", t.skillId); f.append("activityType", t.activityType); f.append("difficulty", t.difficulty); }
     try {
       const r = await upload<{ evidence: Evidence }>("/api/v1/evidence", f);
-      track("evidence_submitted", { artifact_type: kind, revision: !!revisionOf });
+      track("evidence_submitted", { artifact_type: kind, revision: !!revisionOf, past_work: pastWork });
       onSubmitted(r.evidence);
     } catch (e) { setError(e instanceof ApiError ? e.message : "Couldn't submit. Try again."); } finally { setBusy(false); }
   };
@@ -56,8 +64,9 @@ export function EvidenceForm({ selectedMoveId, revisionOf, tags, onSubmitted }: 
   return (
     <div className="flex flex-col gap-4 rounded-lg bg-white p-5">
       <div>
-        <h3 className="text-base font-bold text-navy">{revisionOf ? "Submit a revision" : "Show what you did"}</h3>
+        <h3 className="text-base font-bold text-navy">{revisionOf ? "Submit a revision" : pastWork ? "Log past work" : "Show what you did"}</h3>
         <p className="text-sm text-secondary">
+          {pastWork && "Work you did before counts toward this wish's skills and unlocks. It doesn't complete your current move. "}
           {afterSubmit(policy("VALIDATION_MODE"))}
         </p>
       </div>
@@ -76,7 +85,7 @@ export function EvidenceForm({ selectedMoveId, revisionOf, tags, onSubmitted }: 
       )}
       {userTags && (
         <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Skill"><Select value={t.skillId} onChange={(v) => setT({ ...t, skillId: v })} options={skillOptions} /></Field>
+          <Field label="Skill"><Select value={t.skillId} onChange={(v) => setT({ ...t, skillId: v })} options={skillOptions} placeholder={pastWork ? "Choose a skill" : undefined} /></Field>
           <Field label="Activity type"><Select value={t.activityType} onChange={(v) => setT({ ...t, activityType: v })} options={ACTIVITY_TYPES.map((a) => ({ value: a, label: cap(a) }))} /></Field>
           <Field label="Difficulty"><Select value={t.difficulty} onChange={(v) => setT({ ...t, difficulty: v })} options={DIFFICULTIES.map((d) => ({ value: d, label: cap(d) }))} /></Field>
         </div>

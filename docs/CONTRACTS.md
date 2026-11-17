@@ -139,7 +139,7 @@ Allowed values:
 }
 ```
 
-## GrowthState v0.1 with Unlocks (Module 3, owner Christina Phan)
+## GrowthState v0.2 with Unlocks (Module 3, owner Christina Phan)
 
 This is the `Growth-Validation` branch's `/integrations/growth-state` output, extended with:
 - unlocks (the backbone diagram's "GrowthState + Unlocks");
@@ -151,7 +151,7 @@ It is computed from the points ledger every time it is read. Reading it never wr
 
 | Field | Type | Notes |
 |---|---|---|
-| schemaVersion | `"0.1"` | |
+| schemaVersion | `"0.2"` | 0.2: `recentOutcomes[].selectedMoveId` is null for past-work evidence |
 | userId | uuid | |
 | careerId | string | |
 | rulesVersion, catalogVersion | string | which scoring rules and catalog produced it |
@@ -164,7 +164,7 @@ It is computed from the points ledger every time it is read. Reading it never wr
 
 ```json
 {
-  "schemaVersion": "0.1",
+  "schemaVersion": "0.2",
   "userId": "7c1e0b9a-...",
   "careerId": "data_analyst",
   "rulesVersion": "1.1", "catalogVersion": "c-5f2a91",
@@ -183,15 +183,16 @@ It is computed from the points ledger every time it is read. Reading it never wr
 }
 ```
 
-## SocialEvidence v0.1 (Module 4, owner Michael Hawes)
+## SocialEvidence v0.2 (Module 4, owner Michael Hawes)
 
 This is the record created when a buddy leaves feedback on a move's evidence. The backbone diagram calls it "social interaction becomes evidence". Growth receives it through `growth.api.apply_social_evidence()`. It is stored once and never edited.
 
 | Field | Type | Notes |
 |---|---|---|
-| schemaVersion | `"0.1"` | |
+| schemaVersion | `"0.2"` | |
 | id | uuid | |
-| invitationId, evidenceId, selectedMoveId | uuid | |
+| invitationId, evidenceId | uuid | |
+| selectedMoveId | uuid or null | 0.2: null when the review was of past-work evidence (logged against a wish, not a move) |
 | ownerId, reviewerId | uuid | they are never the same person (D-34) |
 | reviewerRole | `reviewer \| tester` | D-30 |
 | reviewerTier | `Proficient \| Demonstrated \| Verified \| Mentor` | the reviewer's tier in the owner's career at review time, floored at Proficient (D-14) |
@@ -203,7 +204,7 @@ This is the record created when a buddy leaves feedback on a move's evidence. Th
 
 ```json
 {
-  "schemaVersion": "0.1",
+  "schemaVersion": "0.2",
   "id": "5e0c...", "invitationId": "a71b...", "evidenceId": "e1...", "selectedMoveId": "3b9f...",
   "ownerId": "7c1e0b9a-...", "reviewerId": "c2d4...",
   "reviewerRole": "reviewer", "reviewerTier": "Proficient",
@@ -261,11 +262,12 @@ Common fields: `{eventId, schemaVersion, occurredAt, userId, refs}`.
 | ProfileUpdated | profile | `{version}` |
 | MoveSelected | wish | `{wishId, selectedMoveId}` |
 | NextMoveReady | wish | `{wishId, step}` |
-| EvidenceSubmitted | growth | `{evidenceId, selectedMoveId}` |
+| EvidenceSubmitted | growth | `{evidenceId, selectedMoveId, wishId, pastWork}` (selectedMoveId null for past work) |
 | EvidenceScored | growth | `{evidenceId, aiScore, provisionalPoints}` |
 | EvidenceValidated | growth | `{evidenceId, points, peerConfirmed}` |
 | EvidenceNeedsWork | growth | `{evidenceId}` |
 | TierReached | growth | `{skillId, tier}` |
 | UnlockGranted | growth | `{opportunityId}` |
-| InvitationCreated / Accepted / Declined | social | `{invitationId, selectedMoveId, role}` (sent to the invitee or owner as relevant) |
+| ConnectionRequested / ConnectionAccepted | social | `{connectionId, requesterName or addresseeName, handle}` (sent to the person asked, or to the one who asked) |
+| InvitationCreated / Accepted / Declined | social | `{invitationId, selectedMoveId, pastWorkEvidenceId, role}` (one of the two ids is set) (sent to the invitee or owner as relevant) |
 | FeedbackSubmitted | social | `{invitationId, evidenceId, socialEvidenceId}` |

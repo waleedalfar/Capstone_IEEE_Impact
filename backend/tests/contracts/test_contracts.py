@@ -17,7 +17,9 @@ def test_schemas_match_committed():
 
 
 def test_every_contract_is_versioned():
+    import re
+
     from app.contracts.models import ALL
 
     for name, model in ALL.items():
-        assert model.model_fields["schemaVersion"].default == "0.1", name
+        assert re.fullmatch(r"\d+\.\d+", model.model_fields["schemaVersion"].default or ""), name

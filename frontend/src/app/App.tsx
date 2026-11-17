@@ -19,6 +19,7 @@ const GrowthPage = lazy(() => import("@/modules/growth/GrowthPage"));
 const EvidencePage = lazy(() => import("@/modules/growth/EvidencePage"));
 const BuddiesPage = lazy(() => import("@/modules/social/BuddiesPage"));
 const ReviewPage = lazy(() => import("@/modules/social/ReviewPage"));
+const PersonPage = lazy(() => import("@/modules/social/PersonPage"));
 const AdminPage = lazy(() => import("@/admin/AdminPage"));
 
 function Loading() {
@@ -62,6 +63,7 @@ export function App() {
               <Route path="/growth/evidence/:id" element={<Shell><EvidencePage /></Shell>} />
               <Route path="/buddies" element={<Shell><BuddiesPage /></Shell>} />
               <Route path="/buddies/review/:invitationId" element={<Shell><ReviewPage /></Shell>} />
+              <Route path="/people/:handle" element={<Shell><PersonPage /></Shell>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>

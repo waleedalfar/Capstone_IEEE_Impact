@@ -62,6 +62,34 @@ async def find_user(handle: str | None = None, email: str | None = None, search:
     return [{"userId": str(r.user_id), "handle": r.handle, "displayName": r.display_name or r.handle} for r in rows]
 
 
+async def search_people(query: str, exclude_user_id: str, limit: int = 20) -> list[dict]:
+    """People directory (D-54): onboarded users with a handle whose handle or display name contains the text."""
+    q = query.strip().lower().lstrip("@")
+    if len(q) < 2:
+        return []
+    pat = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+    async with db.read() as c:
+        rows = (await c.execute(
+            select(profiles.c.user_id, profiles.c.handle, profiles.c.display_name, profiles.c.headline, profiles.c.target_career_id)
+            .where(profiles.c.handle.is_not(None), profiles.c.onboarding_completed_at.is_not(None),
+                   profiles.c.user_id != exclude_user_id,
+                   profiles.c.handle.ilike(pat, escape="\\") | profiles.c.display_name.ilike(pat, escape="\\"))
+            # exact handle first, then handles that start with it, then the rest by handle
+            .order_by((func.lower(profiles.c.handle) != q), ~profiles.c.handle.ilike(q + "%"), profiles.c.handle)
+            .limit(limit))).all()
+    return [{"userId": str(r.user_id), "handle": r.handle, "displayName": r.display_name or r.handle, "headline": r.headline,
+             "targetCareerId": r.target_career_id} for r in rows]
+
+
+async def user_for_handle(handle: str) -> str | None:
+    """The user id behind an onboarded handle, or None."""
+    async with db.read() as c:
+        v = (await c.execute(select(profiles.c.user_id).where(
+            func.lower(profiles.c.handle) == handle.strip().lower().lstrip("@"),
+            profiles.c.onboarding_completed_at.is_not(None)))).scalar()
+    return str(v) if v else None
+
+
 async def touch_seen(user_id: str):
     return await service.touch_seen(user_id)
 

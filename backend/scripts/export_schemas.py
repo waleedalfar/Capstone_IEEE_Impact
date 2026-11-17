@@ -10,7 +10,10 @@ OUT = Path(__file__).resolve().parents[2] / "contracts" / "schemas"
 
 
 def schemas() -> dict[str, str]:
-    return {f"{name}.v0_1.json": json.dumps(model.model_json_schema(mode="serialization"), indent=2, sort_keys=True) + "\n"
+    def fname(name, model) -> str:
+        return f"{name}.v{model.model_fields['schemaVersion'].default.replace('.', '_')}.json"
+
+    return {fname(name, model): json.dumps(model.model_json_schema(mode="serialization"), indent=2, sort_keys=True) + "\n"
             for name, model in ALL.items()}
 
 

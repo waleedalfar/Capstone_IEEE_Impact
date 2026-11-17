@@ -25,13 +25,17 @@ export type Wish = { id: string; text: string; status: string; type: string | nu
 export type SelectedMove = { selectedMoveId: string; userId: string; wishId: string; status: string; wish: { text: string }; move: Move; selection: { step: number; position: number } };
 
 export type Evidence = {
-  id: string; selectedMoveId: string; onProfile?: boolean; skillId: string; activityType: string; difficulty: string; difficultyFinal: string | null;
+  /** selectedMoveId is null for past work, which belongs to a wish (wishId) instead of a move. */
+  id: string; selectedMoveId: string | null; wishId?: string | null; onProfile?: boolean; skillId: string; activityType: string; difficulty: string; difficultyFinal: string | null;
   artifactType: "link" | "file" | "text"; artifactUrl: string | null; fileName: string | null; hasFile: boolean; summary: string; status: string;
   aiScore: number | null; aiConfidence: number | null; aiFeedback: string | null; aiCriteria: Record<string, number>; finalQuality: number | null;
   peerConfirmed: boolean | null; createdAt: string; finalizedAt: string | null; points: number | null; pendingPoints?: number | null; ownerId?: string;
 };
-export type SkillState = { skillId: string; name: string; core: boolean; points: number; pendingPoints: number; tier: Tier; nextTier: Tier | null; nextThreshold: number | null; progress: number; gates: { rule: string; met: boolean }[] };
-export type Unlock = { opportunityId: string; title: string; tier: Tier; kind: string; description: string; unlockedAt: string | null };
+export type SkillState = { skillId: string; name: string; core: boolean; points: number; pendingPoints: number; tier: Tier; nextTier: Tier | null; nextThreshold: number | null; progress: number; gates: Gate[] };
+/** One requirement for a tier. action says what the user does to meet it; current/target drive a progress bar. */
+export type Gate = { rule: string; met: boolean; action?: "earn_points" | "validate_items" | "hard_item" | "senior_reviewer" | "endorsement" | null; current?: number | null; target?: number | null };
+export type UnlockPlan = { skillId: string | null; skillName: string | null; currentTier: Tier | null; steps: Gate[] };
+export type Unlock = { opportunityId: string; title: string; tier: Tier; kind: string; description: string; unlockedAt: string | null; howToUnlock?: UnlockPlan | null };
 export type GrowthState = {
   userId: string; careerId: string | null; rulesVersion: string; catalogVersion: string;
   totals: { validated: number; pending: number; effortRaw: number; effortCounted: number; effortBanked: number; impact: number };
@@ -41,8 +45,8 @@ export type GrowthState = {
 };
 
 export type Person = { handle: string | null; displayName: string };
-export type Invitation = { id: string; selectedMoveId: string; role: "reviewer" | "tester"; status: string; message: string | null; createdAt: string; owner: Person | null; buddy: Person | null; move: { title: string; detail: string; status: string; wishText: string; skillId: string } | null };
-export type ReviewItem = { invitationId: string; role: "reviewer" | "tester"; selectedMoveId: string; owner: Person | null; move: { title: string; detail: string } | null; evidence: Evidence | null; needsFeedback: boolean };
+export type Invitation = { id: string; selectedMoveId: string | null; evidenceId?: string | null; role: "reviewer" | "tester"; status: string; message: string | null; createdAt: string; owner: Person | null; buddy: Person | null; move: { title: string; detail: string; status: string; wishText: string; skillId: string; pastWork?: boolean } | null };
+export type ReviewItem = { invitationId: string; role: "reviewer" | "tester"; selectedMoveId: string | null; owner: Person | null; move: { title: string; detail: string; pastWork?: boolean } | null; evidence: Evidence | null; needsFeedback: boolean };
 
 export type FeedItem = { id: string; category: Category; kind: string; title: string; body: string; link: string | null; createdAt: string; readAt: string | null };
 export type BestNextMove = { kind: string; reason: string; priority: number; link: string | null };
@@ -54,3 +58,22 @@ export type Home = {
 };
 
 export type PublicConfig = { policies: Record<string, any>; appVersion: string; modelServices: string[]; privacy: string };
+
+/* People directory and connections (D-54). connection is from the viewer's side. */
+export type ConnectionState = "none" | "outgoing" | "incoming" | "connected" | "self";
+export type PersonResult = { handle: string; displayName: string; headline: string; targetCareer: string | null; connection: ConnectionState };
+export type PublicProfile = {
+  handle: string; displayName: string; headline: string; bio: string; position: string;
+  education: { institution: string; major: string; gradYear: number | null }; targetCareer: string | null;
+  skills: string[]; interests: string[];
+  contributions: { title: string; type: string; description: string; verified: boolean }[];
+  growth: {
+    impact: number; validated: number; roleTier: Tier;
+    skills: { skillId: string; name: string; core: boolean; tier: Tier; points: number; nextTier: Tier | null; progress: number }[];
+    badges: { id: string; name: string; rarity: string; description: string; earned: boolean }[];
+    unlocks: { opportunityId: string; title: string; tier: Tier; description: string }[];
+  };
+  connections: number; connection: ConnectionState; connectionId: string | null;
+};
+export type ConnectionItem = { id: string; person: Person | null; createdAt: string; respondedAt: string | null };
+export type Connections = { connections: ConnectionItem[]; received: ConnectionItem[]; sent: ConnectionItem[] };

@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router";
 import { Button, ErrorNote, PageTitle, Panel, Skeleton } from "@/components/ui";
 import { ApiError, get } from "@/lib/api";
 import type { Evidence } from "@/lib/types";
+import { BuddyPanel } from "@/modules/social/BuddyPanel";
 import { EvidenceCard } from "./EvidenceCard";
 
 export default function EvidencePage() {
@@ -23,11 +24,15 @@ export default function EvidencePage() {
   return (
     <div className="mx-auto flex max-w-[820px] flex-col gap-4">
       <Link to={role === "owner" ? "/growth" : "/buddies"} className="text-sm font-semibold text-primary hover:opacity-60">Back</Link>
-      <PageTitle sub={`${e.activityType} · ${e.difficultyFinal ?? e.difficulty} · ${e.skillId.replace(/_/g, " ")}`}>Evidence</PageTitle>
+      <PageTitle sub={`${e.selectedMoveId ? "" : "Past work · "}${e.activityType} · ${e.difficultyFinal ?? e.difficulty} · ${e.skillId.replace(/_/g, " ")}`}>Evidence</PageTitle>
       <Panel>
         <EvidenceCard e={e} link={false} />
         {e.hasFile && <Button kind="secondary" className="mt-4" onClick={openFile}>Open the file</Button>}
       </Panel>
+      {/* Past work has no move, so its reviewer is invited here, onto the evidence itself. */}
+      {role === "owner" && !e.selectedMoveId && e.status !== "withdrawn" && (
+        <BuddyPanel evidenceId={e.id} open={e.status !== "validated"} />
+      )}
     </div>
   );
 }
