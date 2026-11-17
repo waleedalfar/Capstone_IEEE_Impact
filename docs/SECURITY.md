@@ -3,7 +3,7 @@
 This file covers what protects the integrated app and the risks that are left. The previous Wish Engine version is in `docs/wish-engine/SECURITY.md`.
 
 ## Identity
-- **Users.** Supabase Auth handles sign-up and sign-in with email and password, magic link or Google. Supabase handles password hashing, email confirmation and password reset. No module keeps passwords anymore:
+- **Users.** Supabase Auth handles sign-up and sign-in with email and password, or Google. Supabase handles password hashing and password reset. Email confirmation is off in production (docs/DEPLOY.md), so an account's email address is not proven. No module keeps passwords anymore:
   - Growth-Validation's bcrypt/JWT users are removed;
   - mike-branch's PBKDF2 users and sessions are removed.
 - **Token check.** Every `/api/v1` call carries the Supabase access token. FastAPI verifies it with Supabase's public keys (JWKS, ES256/RS256), with the legacy HS256 secret as a fallback (T-04). It checks:

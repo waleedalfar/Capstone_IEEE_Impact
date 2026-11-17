@@ -1,7 +1,7 @@
 /**
  * End-to-end: two users through the whole product in headless Chrome (docs/TESTING.md).
  *   sign up -> onboarding -> Home -> wish -> questions -> options -> lock -> evidence -> invite buddy
- *   -> buddy signs in by magic link (Mailpit) -> accepts -> reviews -> points final -> feed -> move 2 opens
+ *   -> buddy signs back in with a password -> accepts -> reviews -> points final -> feed -> move 2 opens
  * Needs: supabase start, the API serving the built app with ENV=test LLM_FAKE=1 (npm run e2e:serve).
  * Usage: npx tsx e2e/full-loop.ts [--shots=dir]   (BASE_URL defaults to http://localhost:8000)
  * It follows the live policy values (GET /api/v1/config), so serving with owners' original choices, e.g.
@@ -12,7 +12,6 @@ import { chromium, type Page } from "playwright-core";
 
 const base = process.env.BASE_URL ?? "http://localhost:8000";
 const shots = process.argv.find((a) => a.startsWith("--shots="))?.slice(8);
-const mailpit = process.env.MAILPIT_URL ?? "http://127.0.0.1:54324";
 const id = Math.random().toString(36).slice(2, 7);
 const errors: string[] = [];
 const pages: Page[] = [];
@@ -51,20 +50,6 @@ async function onboard(p: Page, name: string, handle: string) {
   await p.getByRole("button", { name: "Next" }).click();
   await p.getByRole("button", { name: "Finish and go to Home" }).click();
   await p.getByRole("heading", { name: "Notifications" }).waitFor();
-}
-
-async function magicLink(email: string): Promise<string> {
-  for (let i = 0; i < 30; i++) {
-    const list = await (await fetch(`${mailpit}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`)).json();
-    const msg = list.messages?.[0];
-    if (msg) {
-      const full = await (await fetch(`${mailpit}/api/v1/message/${msg.ID}`)).json();
-      const m = String(full.Text ?? full.HTML).match(/https?:\/\/[^\s"<>]+verify[^\s"<>]+/);
-      if (m) return m[0].replace(/&amp;/g, "&");
-    }
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  throw new Error("no magic link email");
 }
 
 (async () => {
@@ -148,13 +133,11 @@ async function magicLink(email: string): Promise<string> {
     }
     await a.getByText("invited").waitFor();
 
-    // B comes back with a magic link (Mailpit)
+    // B signs back in with a password
     await b.getByRole("heading", { name: "Sign in" }).waitFor();
-    await b.getByRole("button", { name: "Email me a link" }).click();
     await b.getByLabel("Email").fill(`priya-${id}@example.com`);
-    await b.getByRole("button", { name: "Send sign-in link" }).click();
-    await b.getByText("Check your email").waitFor();
-    await b.goto(await magicLink(`priya-${id}@example.com`));
+    await b.getByLabel("Password").fill("test-password-123");
+    await b.getByRole("button", { name: "Sign in", exact: true }).click();
     await b.getByRole("heading", { name: "Notifications" }).waitFor({ timeout: 20_000 });
     await b.getByText(/invited you as a reviewer/).first().waitFor();
     await shot(b, "buddy-home");
