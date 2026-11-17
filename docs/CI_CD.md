@@ -76,7 +76,7 @@ If a new version fails Render's health check, Render keeps serving the previous 
 
 ## One-time setup
 Already done on GitHub: `main` is the default branch; the `production` environment exists (deploys from `main` only, needs an
-approval; `staging` exists too, empty and unused until staging is set up); the `main` ruleset requires a PR with 1 approval plus **CI passed** and
+approval; `staging` exists too, empty and unused until staging is set up); the `main` ruleset requires a PR (no approval needed, so you can merge your own) plus **CI passed** and
 **Security passed**; Dependabot alerts, secret scanning and push protection are on.
 
 Still to do:
@@ -89,7 +89,7 @@ Still to do:
   1. Branch from `main`.
   2. Run `npm run lint && npm test` before pushing (the integration tests need `npm run db:start`).
   3. Open a PR into `main`. CI and Security run on it.
-  4. Merge once both pass and it's approved. Production deploys once you approve the deploy (Actions → the run →
+  4. Merge once both pass (a teammate's review is welcome but not required). Production deploys once you approve the deploy (Actions → the run →
      **Review deployments** → tick `production` → **Approve and deploy**).
 - **To reproduce the CI e2e:**
   1. Build with `npm run build`.

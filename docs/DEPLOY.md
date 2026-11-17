@@ -115,7 +115,7 @@ After this, every merge to `main` runs CI, then waits for the same approval (ste
 2. **Google sign-in** (optional): see below.
 
 ## What protects production without staging
-- A merge needs a PR, an approval, and both **CI passed** and **Security passed** (the `main` ruleset).
+- A merge needs a PR and both **CI passed** and **Security passed** (the `main` ruleset).
 - CI applies every migration to a fresh local Supabase, lints the schema, and runs the integration and browser tests
   against it.
 - Each deploy waits for an approval, applies migrations before the new code starts, and stops before deploying if a
