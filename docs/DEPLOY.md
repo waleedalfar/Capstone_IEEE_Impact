@@ -20,13 +20,16 @@ In the Supabase dashboard, supabase.com/dashboard. You don't create any tables: 
    5. Click **Create new project** and wait for it to finish setting up.
 2. **Don't link it to GitHub.** The pipeline applies migrations. If you already linked it: **Project Settings** →
    **Integrations** → **GitHub Integration** → **Disable integration**.
-3. **Signing keys.** **Project Settings** → **JWT Keys**. If the current key says **Legacy HS256**, click
+3. **Email confirmation off.** Supabase's built-in email sender allows only 2 emails an hour for the whole project,
+   and every sign-up would use one. **Authentication** → **Sign In / Providers** → **Email** → turn **Confirm email**
+   off → **Save**. New accounts are signed in straight away. Turn it back on once custom SMTP is set up (step 6).
+4. **Signing keys.** **Project Settings** → **JWT Keys**. If the current key says **Legacy HS256**, click
    **Migrate JWT secret**, then **Rotate keys**, so the current key is ES256.
-4. **Redirect URLs** (after step 2 below gives you your app's address).
+5. **Redirect URLs** (after step 2 below gives you your app's address).
    1. **Authentication** → **URL Configuration**.
    2. **Site URL:** `https://<your-app>.onrender.com`. Click **Save**.
    3. Under **Redirect URLs**, click **Add URL**, enter `https://<your-app>.onrender.com/**`, and click **Save URLs**.
-5. **Copy these values:**
+6. **Copy these values:**
 
    | Value | Where in Supabase | Goes into |
    |---|---|---|
@@ -103,7 +106,8 @@ After this, every merge to `main` runs CI, then waits for the same approval (ste
    The `ip` shown should be your real address, not `1.2.3.4`.
 
 ### 6. Before real users
-1. **Email:** the built-in sender allows only a few emails an hour (Q5).
+1. **Email:** the built-in sender allows 2 emails an hour for the whole project (Q5). Password-reset emails still use
+   it. With your own provider, turn **Confirm email** back on (step 1.3).
    1. Sign up with an email provider (for example Resend or Postmark), verify your sending domain, and create SMTP
       credentials.
    2. In Supabase: **Authentication** → **Emails** → **SMTP Settings** → **Enable custom SMTP**.
@@ -162,7 +166,7 @@ That's fine for development and demos. Use paid tiers for a real cohort (Q6).
 ## Local development
 ```
 npm run setup          # deps + backend/.venv
-npm run db:start       # local Postgres :54322, API :54321, Studio :54323, Mailpit :54324 (magic-link emails)
+npm run db:start       # local Postgres :54322, API :54321, Studio :54323, Mailpit :54324 (password-reset emails)
 npm run db:reset       # apply supabase/migrations
 npm run api            # FastAPI on :8000
 npm run dev            # Vite on :5173, proxies /api to :8000

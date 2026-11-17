@@ -6,7 +6,7 @@ import { useConfig } from "@/lib/config";
 import { supabase } from "@/lib/supabase";
 import { AuthCard } from "./AuthCard";
 
-/** Magic links, email confirmations and Google all land here. supabase-js exchanges the PKCE code itself on load
+/** Email confirmations, password-reset links and Google all land here. supabase-js exchanges the PKCE code itself on load
  *  (detectSessionInUrl); exchanging it again here would fail because the verifier is used up. */
 export default function Callback() {
   const [params] = useSearchParams();

@@ -29,7 +29,7 @@ These come from merging five separate apps into one. They aren't up for per-modu
 
 | What your branch had | What the integrated app does |
 |---|---|
-| Its own login (Growth-Validation's JWT, mike-branch's sessions) or none (Professional-State, Event_Ecosystem) | One Supabase sign-in: email and password, magic link, or Google |
+| Its own login (Growth-Validation's JWT, mike-branch's sessions) or none (Professional-State, Event_Ecosystem) | One Supabase sign-in: email and password, or Google (off until set up). No emailed sign-in links, and no email confirmation in production: each would count against Supabase's hourly email limit |
 | SQLite, or its own Postgres | One Supabase Postgres, one schema per module |
 | Its own server | One FastAPI app; each module is a package that talks to the others only through versioned contracts (`docs/CONTRACTS.md`) |
 | Its own frontend style | Event_Ecosystem's design everywhere (`docs/DESIGN.md`) |

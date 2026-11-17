@@ -12,7 +12,7 @@ Needs Docker (for local Supabase), the Supabase CLI (`brew install supabase/tap/
 
 ```
 npm run setup          # node deps (root + frontend) and backend/.venv
-npm run db:start       # local Supabase: Postgres, Auth, Storage, Mailpit (magic-link emails at http://127.0.0.1:54324)
+npm run db:start       # local Supabase: Postgres, Auth, Storage, Mailpit (password-reset emails at http://127.0.0.1:54324)
                        # and writes its URLs and keys into .env.local for you (rerun alone: npm run env:local)
 npm run db:reset       # apply supabase/migrations
 cp .env.example .env   # then fill in the two values below

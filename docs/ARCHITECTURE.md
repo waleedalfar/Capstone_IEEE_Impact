@@ -93,7 +93,7 @@ sequenceDiagram
   participant B as Browser
   participant S as Supabase Auth
   participant A as FastAPI
-  B->>S: sign up / sign in (password, magic link or Google)
+  B->>S: sign up / sign in (password or Google)
   S-->>B: session (access token ~1 h, refresh token)
   B->>A: GET /api/v1/me  Authorization: Bearer <access token>
   A->>A: verify signature with Supabase JWKS (cached ≤10 min), check iss, aud=authenticated, exp
