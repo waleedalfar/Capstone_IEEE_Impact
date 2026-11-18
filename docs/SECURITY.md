@@ -77,8 +77,9 @@ Details in [CI_CD.md](CI_CD.md).
   - GitHub Actions are pinned to full commit SHAs, and each workflow gets only the permissions it uses.
   - Dependabot proposes updates only for releases at least 14 days old.
 - **Deploys:**
-  - Only commits that passed every check deploy, and each deploy targets that exact commit.
-  - Production needs an approval.
+  - Deploys are started by hand (typing `deploy`) by someone with write access, and only for a commit that passed CI;
+    each deploy targets that exact commit.
+  - Anyone with write access can push to `main` and deploy, so give write access only to the team.
   - Deploy secrets live in GitHub environments, scoped to their branch.
 
 ## Known risks (accepted for now)

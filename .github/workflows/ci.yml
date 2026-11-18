@@ -1,6 +1,5 @@
-# CI/CD (docs/CI_CD.md). Every PR and push runs every check; "CI passed" is the one check branch protection needs.
-# Work lands on main through PRs. A push to main that passes deploys production after an approval (and staging first,
-# once STAGING_ENABLED is set).
+# CI (docs/CI_CD.md). Every push to main and every PR runs every check; "CI passed" is the one result that matters.
+# CI never deploys. Deploys are started by hand with the Deploy workflow, which refuses a commit unless CI passed on it.
 name: CI
 
 on:
@@ -14,8 +13,8 @@ permissions:
   contents: read
 
 concurrency:
-  # PRs: a new push cancels the older run. Branch pushes: every commit gets its own full run (unique group). Deploys
-  # can't go backwards: deploy.yml skips itself when a newer commit is already on the branch.
+  # PRs: a new push cancels the older run. Pushes to main: every commit gets its own full run (unique group), so each
+  # commit gets its own "CI passed" result for the Deploy workflow to check.
   group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
@@ -186,28 +185,3 @@ jobs:
         run: |
           echo "results: $RESULTS"
           for r in $RESULTS; do [ "$r" = success ] || { echo "::error::a required check did not pass ($r)"; exit 1; }; done
-
-  deploy-staging:
-    name: Deploy staging
-    # Off until a staging environment exists: set the repository variable STAGING_ENABLED=true (docs/DEPLOY.md).
-    needs: required
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.STAGING_ENABLED == 'true'
-    uses: ./.github/workflows/deploy.yml
-    with:
-      environment: staging
-    secrets: inherit
-
-  deploy-production:
-    name: Deploy production
-    # The commit that passed CI, after staging deployed it (when staging is on) and someone approves (production
-    # environment protection). !cancelled() lets it run when staging was skipped; it never runs if CI or staging failed
-    # or the run was cancelled.
-    needs: [required, deploy-staging]
-    if: >-
-      !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main'
-      && needs.required.result == 'success'
-      && (needs.deploy-staging.result == 'success' || needs.deploy-staging.result == 'skipped')
-    uses: ./.github/workflows/deploy.yml
-    with:
-      environment: production
-    secrets: inherit

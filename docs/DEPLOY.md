@@ -1,9 +1,9 @@
 # Deploy
 
 There is one environment for now, **production**: the Render web service `impact-app` (API + React build) and the
-Supabase project `impact-production` (Postgres, Auth, Storage). Every commit that passes CI on `main` deploys to it
-after an approval. GitHub Actions runs the deploy ([CI_CD.md](CI_CD.md)). Staging can be added later (see "Adding
-staging later"); until then the staging deploy step is skipped. The Wish Engine's earlier deployment notes are in
+Supabase project `impact-production` (Postgres, Auth, Storage). You deploy by hand: run the Deploy workflow and type
+`deploy`. It deploys the newest commit on `main`, and only if CI passed on it ([CI_CD.md](CI_CD.md)). Staging can be
+added later (see "Adding staging later"). The Wish Engine's earlier deployment notes are in
 `docs/wish-engine/DEPLOY.md`.
 
 ## First deploy, in order
@@ -79,15 +79,15 @@ On github.com: the repository → **Settings** → **Environments** → `product
    - `SUPABASE_DB_PASSWORD` = the database password
    - `RENDER_DEPLOY_HOOK_URL` = the deploy hook
 
-Leave the `staging` environment empty, and don't create a `STAGING_ENABLED` variable.
+Leave the `staging` environment empty.
 
 ### 4. Deploy
 1. On github.com, open the repository → **Actions** tab.
 2. In the left list, click **Deploy**.
-3. Click **Run workflow** (right side), leave the branch as `main`, choose environment `production`, and click the
-   green **Run workflow** button.
-4. Open the run that appears. It pauses at "Waiting for review": click **Review deployments**, tick `production`,
-   and click **Approve and deploy**.
+3. Click **Run workflow** (right side). Leave **Use workflow from** as `main`, type `deploy` in the confirm box, leave
+   the environment as `production`, and click the green **Run workflow** button.
+4. Open the run that appears. **Ready to deploy?** checks the word you typed and that CI passed on the newest commit
+   on `main`. If it says CI is still running, wait for it under **Actions** → **CI**, then run Deploy again.
 5. It then checks the settings, shows the pending migrations (dry run), applies them, calls the deploy hook with the
    commit, and waits until `/api/v1/health` reports that commit. A free Render service can take several minutes on
    its first build.
@@ -95,7 +95,7 @@ Leave the `staging` environment empty, and don't create a `STAGING_ENABLED` vari
    step 3. A permission (403) error in the migration step names a permission the access token lacks: generate a new
    token with it added (a token's scope can't be edited) and replace `SUPABASE_ACCESS_TOKEN`.
 
-After this, every merge to `main` runs CI, then waits for the same approval (step 4) before deploying.
+After this, every push to `main` runs CI. Whenever you want the newest version live, run step 4 again.
 
 ### 5. Check the running app
 1. Open `https://<your-app>.onrender.com` and sign up with a real email address.
@@ -115,24 +115,22 @@ After this, every merge to `main` runs CI, then waits for the same approval (ste
 2. **Google sign-in** (optional): see below.
 
 ## What protects production without staging
-- A merge needs a PR and both **CI passed** and **Security passed** (the `main` ruleset).
+- Deploy refuses any commit that didn't pass CI, and it only runs when someone with write access starts it and types
+  `deploy`.
 - CI applies every migration to a fresh local Supabase, lints the schema, and runs the integration and browser tests
   against it.
-- Each deploy waits for an approval, applies migrations before the new code starts, and stops before deploying if a
-  migration fails.
+- Each deploy applies migrations before the new code starts, and stops before deploying if a migration fails.
 - What staging would add: trying the migrations and the new code on a hosted copy before real data. Until it exists,
   write migrations that only add (new tables, new nullable columns) and check the dry-run step in each deploy log.
 
 ## Adding staging later
 1. Create a second Supabase project, `impact-staging`, with step 1 (Site URL `https://impact-app-staging.onrender.com`).
    Generate a new access token scoped to both projects and replace `SUPABASE_ACCESS_TOKEN` in `production` too.
-2. In `render.yaml`, copy the `impact-app` service as `impact-app-staging` and merge that. In Render, open the
+2. In `render.yaml`, copy the `impact-app` service as `impact-app-staging` and push that. In Render, open the
    Blueprint → **Manual Sync**, fill in the staging values, and copy its deploy hook.
 3. Fill in the GitHub `staging` environment with step 3 (`APP_URL` = `https://impact-app-staging.onrender.com`).
-4. Run the Deploy workflow (step 4) with `staging`.
-5. Turn it on: the repository → **Settings** → **Secrets and variables** → **Actions** → **Variables** tab →
-   **New repository variable**, name `STAGING_ENABLED`, value `true`. From then on each merge deploys staging first,
-   and production only after staging succeeds.
+4. Deploy to it with step 4, choosing `staging` as the environment. Try each change there before deploying it to
+   `production`.
 
 ## Applying migrations by hand
 Normally the deploy workflow does this. If you need to (CLI v3: without `--remote`, `db push` targets your *local*
