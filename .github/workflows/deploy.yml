@@ -1,20 +1,20 @@
-# Deploy one environment (docs/CI_CD.md): migrations on its Supabase project, then the exact commit on its Render service,
-# then wait until that commit is live and smoke-test it. Called by ci.yml after every check passes; can also be run by hand.
+# Deploy (docs/CI_CD.md). Started by hand: Actions -> Deploy -> Run workflow, type "deploy", Run workflow.
+# It deploys the newest commit on main, and only if CI passed on that commit: migrations on the Supabase project, then
+# that exact commit on Render, then it waits until the commit is live and smoke-tests it.
 name: Deploy
 
 on:
-  workflow_call:
-    inputs:
-      environment:
-        type: string
-        required: true
   workflow_dispatch:
     inputs:
+      confirm:
+        description: Type deploy to deploy the newest commit on main
+        type: string
+        required: true
       environment:
         description: Which environment
         type: choice
-        options: [staging, production]
-        required: true
+        options: [production, staging]
+        default: production
       skip_migrations:
         description: Skip migrations (redeploying an older commit; migrations only move forward)
         type: boolean
@@ -24,11 +24,43 @@ permissions:
   contents: read
 
 jobs:
+  check:
+    # Runs before any secret is loaded: the typed word, the branch, and CI's result for this exact commit.
+    name: Ready to deploy?
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      checks: read
+    steps:
+      - name: Typed "deploy", from main, CI passed
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$(echo "$CONFIRM" | tr '[:upper:]' '[:lower:]' | xargs)" != "deploy" ]; then
+            echo "::error::Type deploy in the confirm box to deploy."; exit 1
+          fi
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Deploys run from main only. In Run workflow, leave 'Use workflow from' as main."; exit 1
+          fi
+          result=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs?check_name=CI%20passed" \
+            --jq '[.check_runs[] | .conclusion // .status] | first // "missing"')
+          case "$result" in
+            success) echo "CI passed on ${GITHUB_SHA:0:7}." ;;
+            queued|in_progress|pending|waiting|requested)
+              echo "::error::CI is still running on ${GITHUB_SHA:0:7}. Wait for it to finish (Actions -> CI), then run Deploy again."; exit 1 ;;
+            missing)
+              echo "::error::No CI result for ${GITHUB_SHA:0:7}. CI runs on every push to main; wait for it, then run Deploy again."; exit 1 ;;
+            *)
+              echo "::error::CI did not pass on ${GITHUB_SHA:0:7} ($result). Fix it and push again; only commits that pass deploy."; exit 1 ;;
+          esac
+
   deploy:
     name: ${{ inputs.environment }}
+    needs: check
     runs-on: ubuntu-24.04
     timeout-minutes: 40
-    # The environment holds this target's secrets; production also requires an approval before this job starts.
+    # The environment holds this target's secrets and only accepts deploys from main.
     environment:
       name: ${{ inputs.environment }}
       url: ${{ vars.APP_URL }}
@@ -44,44 +76,31 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Still the newest commit on the branch?
-        id: fresh
-        run: |
-          head=$(git ls-remote origin "refs/heads/${GITHUB_REF_NAME}" | cut -f1)
-          if [ -n "$head" ] && [ "$head" != "$GITHUB_SHA" ]; then
-            echo "::notice::${GITHUB_REF_NAME} has moved on to ${head:0:7}; its own run deploys it, so this older commit is skipped."
-            echo "newest=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "newest=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Check this environment is configured
-        if: steps.fresh.outputs.newest == 'true'
         run: |
           missing=""
           for v in APP_URL SUPABASE_PROJECT_REF SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD RENDER_DEPLOY_HOOK_URL; do
             [ -n "${!v}" ] || missing="$missing $v"
           done
           if [ -n "$missing" ]; then
-            echo "::error::The '${{ inputs.environment }}' environment is missing:$missing. See docs/CI_CD.md, 'One-time setup'."
+            echo "::error::The '${{ inputs.environment }}' environment is missing:$missing. See docs/DEPLOY.md, step 3."
             exit 1
           fi
 
       - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
-        if: steps.fresh.outputs.newest == 'true' && !inputs.skip_migrations
+        if: ${{ !inputs.skip_migrations }}
         with:
           version: "3.0.0"
 
       - name: Migrations to apply
-        if: steps.fresh.outputs.newest == 'true' && !inputs.skip_migrations
+        if: ${{ !inputs.skip_migrations }}
         run: supabase db push --remote="$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD" --skip-vault --dry-run
 
       - name: Apply migrations (the deploy stops here if one fails)
-        if: steps.fresh.outputs.newest == 'true' && !inputs.skip_migrations
+        if: ${{ !inputs.skip_migrations }}
         run: supabase db push --remote="$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD" --skip-vault --yes
 
       - name: Deploy this exact commit on Render
-        if: steps.fresh.outputs.newest == 'true'
         run: |
           code=$(curl -sS -o render-response.txt -w '%{http_code}' -X POST "${RENDER_DEPLOY_HOOK_URL}&ref=${GITHUB_SHA}")
           echo "Render answered $code"
@@ -91,7 +110,6 @@ jobs:
           fi
 
       - name: Wait until it is live, then smoke-test
-        if: steps.fresh.outputs.newest == 'true'
         run: scripts/ci/wait-for-deploy.sh "$APP_URL" "$GITHUB_SHA" 30
 
       - name: Summary
@@ -100,7 +118,7 @@ jobs:
           {
             echo "### ${{ inputs.environment }}: ${{ job.status }}"
             echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Started by: ${{ github.actor }}"
             echo "- URL: ${APP_URL}"
             echo "- Migrations: ${{ inputs.skip_migrations && 'skipped' || 'applied' }}"
-            [ "${{ steps.fresh.outputs.newest }}" = true ] || echo "- Skipped: a newer commit is on the branch and deploys in its own run"
           } >> "$GITHUB_STEP_SUMMARY"
