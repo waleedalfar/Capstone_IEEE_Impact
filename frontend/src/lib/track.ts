@@ -1,5 +1,5 @@
 import { API_BASE, post } from "./api";
-import { accessToken } from "./supabase";
+import { accessToken, supabase } from "./supabase";
 import { uuid } from "./uuid";
 
 /**
@@ -55,6 +55,19 @@ export async function flush(useBeacon = false) {
       headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify({ events: batch }),
     });
+    if (res.status === 401) {
+		const body = await res.json().catch(() => null);
+		if (body?.code === "STALE_SESSION") {
+        const { error } = await supabase.auth.signOut({ scope: "local" });
+        if (error) throw error;
+
+        queue = [];
+        ticket = null;
+        failures = 0;
+        window.location.replace("/auth/sign-up");
+        return;
+      }
+	  }
     if (res.ok || (res.status >= 400 && res.status < 500 && res.status !== 429)) { failures = 0; if (queue.length) schedule(0); return; }
     throw new Error(String(res.status));
   } catch {
