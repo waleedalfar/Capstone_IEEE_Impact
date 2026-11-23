@@ -10,7 +10,7 @@ export type Draft = Omit<ProfessionalState, "schemaVersion" | "userId" | "onboar
 
 export const emptyDraft = (): Draft => ({
   handle: "", displayName: "", headline: "", bio: "", education: { institution: "", major: "", gradYear: null }, position: "Student",
-  targetCareerId: null, skills: [], interests: [], strengths: [], growthAreas: [], featuredContributions: [],
+  targetCareerId: null, targetCareerOther: null, skills: [], interests: [], strengths: [], growthAreas: [], featuredContributions: [],
 });
 
 export function fromState(s: ProfessionalState): Draft {
@@ -26,7 +26,8 @@ export function mergeImport(d: Draft, imp: Partial<Draft>): Draft {
     displayName: keep(d.displayName, imp.displayName), headline: keep(d.headline, imp.headline), bio: keep(d.bio, imp.bio),
     position: keep(d.position === "Student" ? "" : d.position, imp.position) || d.position,
     education: { institution: keep(d.education.institution, imp.education?.institution), major: keep(d.education.major, imp.education?.major), gradYear: d.education.gradYear ?? imp.education?.gradYear ?? null },
-    targetCareerId: d.targetCareerId ?? imp.targetCareerId ?? null,
+    targetCareerId: d.targetCareerId ?? (d.targetCareerOther ? null : imp.targetCareerId ?? null),
+    targetCareerOther: d.targetCareerId ? null : d.targetCareerOther || imp.targetCareerOther || null,
     skills: union(d.skills, imp.skills), interests: union(d.interests, imp.interests), strengths: union(d.strengths, imp.strengths),
     growthAreas: union(d.growthAreas, imp.growthAreas),
     featuredContributions: [...d.featuredContributions, ...(imp.featuredContributions ?? [])].slice(0, 10),
@@ -55,14 +56,28 @@ export function BasicsFields({ d, set }: { d: Draft; set: (p: Partial<Draft>) =>
     <div className="grid gap-4 md:grid-cols-2">
       <Field label="Name"><Input value={d.displayName} maxLength={80} onChange={(e) => set({ displayName: e.target.value })} /></Field>
       <HandleField value={d.handle ?? ""} onChange={(handle) => set({ handle })} />
-      <div className="md:col-span-2"><Field label="Headline" hint="One line, for example: CS senior building data tools."><Input value={d.headline} maxLength={120} onChange={(e) => set({ headline: e.target.value })} /></Field></div>
+      <div className="md:col-span-2"><Field label="Headline" hint="One line, for example: Mechanical engineering senior designing drone frames."><Input value={d.headline} maxLength={120} onChange={(e) => set({ headline: e.target.value })} /></Field></div>
       <div className="md:col-span-2"><Field label="About you" hint="Optional. Never sent to the move generator."><TextArea value={d.bio} maxLength={1000} onChange={(e) => set({ bio: e.target.value })} /></Field></div>
     </div>
   );
 }
 
+const OTHER = "__other";
+
+/** The career picker's value: a listed career id, OTHER when the student types their own (D-55), or "". */
+export function careerChoice(d: Draft): string {
+  return d.targetCareerId ?? (d.targetCareerOther != null ? OTHER : "");
+}
+
+export function careerLabel(d: Draft, careers: { id: string; name: string }[] | undefined): string | null {
+  return careers?.find((c) => c.id === d.targetCareerId)?.name ?? (d.targetCareerOther?.trim() || null);
+}
+
 export function BackgroundFields({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void }) {
-  const { catalog } = useConfig();
+  const { catalog, policy } = useConfig();
+  const otherAllowed = policy("CAREER_OTHER") !== false;
+  const choice = careerChoice(d);
+  const options = (catalog?.careers ?? []).map((c) => ({ value: c.id, label: c.name }));
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <Field label="School"><Input value={d.education.institution} maxLength={120} onChange={(e) => set({ education: { ...d.education, institution: e.target.value } })} /></Field>
@@ -70,10 +85,15 @@ export function BackgroundFields({ d, set }: { d: Draft; set: (p: Partial<Draft>
       <Field label="Graduation year"><Input type="number" min={1990} max={2040} value={d.education.gradYear ?? ""} onChange={(e) => set({ education: { ...d.education, gradYear: e.target.value ? Number(e.target.value) : null } })} /></Field>
       <Field label="Current position"><Input value={d.position} maxLength={80} onChange={(e) => set({ position: e.target.value })} placeholder="Student, intern, ..." /></Field>
       <div className="md:col-span-2">
-        <Field label="Target career" hint="Your growth is tracked against this career's skills.">
-          <Select value={d.targetCareerId ?? ""} onChange={(v) => set({ targetCareerId: v || null })} placeholder="Choose a career"
-            options={(catalog?.careers ?? []).map((c) => ({ value: c.id, label: c.name }))} />
+        <Field label="Target career" hint={choice === OTHER ? "Your growth is tracked against the skills you list on the next step." : "Your growth is tracked against this career's skills."}>
+          <Select value={choice} placeholder="Choose a career"
+            onChange={(v) => set(v === OTHER ? { targetCareerId: null, targetCareerOther: d.targetCareerOther ?? "" } : { targetCareerId: v || null, targetCareerOther: null })}
+            options={otherAllowed ? [...options, { value: OTHER, label: "Other (type it)" }] : options} />
         </Field>
+        {choice === OTHER && (
+          <div className="mt-3"><Field label="Your target career"><Input value={d.targetCareerOther ?? ""} maxLength={60} placeholder="Nuclear engineer"
+            onChange={(e) => set({ targetCareerOther: e.target.value })} /></Field></div>
+        )}
         {d.targetCareerId && (
           <p className="mt-2 text-xs text-secondary">Skills: {catalog?.careers.find((c) => c.id === d.targetCareerId)?.skills.map((s) => s.name).join(", ")}</p>
         )}
@@ -85,10 +105,10 @@ export function BackgroundFields({ d, set }: { d: Draft; set: (p: Partial<Draft>
 export function SkillsFields({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void }) {
   return (
     <div className="grid gap-5 md:grid-cols-2">
-      <Field label="Skills you have" hint="Press Enter after each one."><TagInput value={d.skills} max={30} onChange={(skills) => set({ skills })} placeholder="Python" /></Field>
-      <Field label="Interests"><TagInput value={d.interests} onChange={(interests) => set({ interests })} placeholder="sports analytics" /></Field>
+      <Field label="Skills you have" hint="Press Enter after each one."><TagInput value={d.skills} max={30} onChange={(skills) => set({ skills })} placeholder="MATLAB" /></Field>
+      <Field label="Interests"><TagInput value={d.interests} onChange={(interests) => set({ interests })} placeholder="renewable energy" /></Field>
       <Field label="Strengths" hint="What you're good at."><TagInput value={d.strengths} max={10} onChange={(strengths) => set({ strengths })} placeholder="explaining results" /></Field>
-      <Field label="Growth areas" hint="Where you want to improve. Moves aim here."><TagInput value={d.growthAreas} max={10} onChange={(growthAreas) => set({ growthAreas })} placeholder="statistics" /></Field>
+      <Field label="Growth areas" hint="Where you want to improve. Moves aim here."><TagInput value={d.growthAreas} max={10} onChange={(growthAreas) => set({ growthAreas })} placeholder="technical writing" /></Field>
     </div>
   );
 }

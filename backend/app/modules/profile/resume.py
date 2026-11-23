@@ -26,6 +26,8 @@ SYSTEM = (
     "strengths: what they seem good at, phrased briefly. growthAreas: gaps a reader would notice (for example no "
     "industry experience), at most 3. contributions: projects, coursework or jobs worth featuring, each with a "
     "one-sentence description. targetCareerId: the best fitting id from the allowed list, or an empty string. "
+    "targetCareerOther: when no listed career fits, the career they are aiming for in at most 4 words (for example "
+    "Nuclear Engineer), otherwise an empty string. "
     "Output JSON only, matching the provided schema."
 )
 
@@ -39,6 +41,7 @@ class Draft(BaseModel):
     gradYear: int | None = None
     position: str = Field(default="", max_length=80)
     targetCareerId: str = ""
+    targetCareerOther: str = ""
     skills: list[str] = Field(default_factory=list)
     interests: list[str] = Field(default_factory=list)
     strengths: list[str] = Field(default_factory=list)
@@ -55,6 +58,7 @@ def schema(career_ids: list[str]) -> dict:
             "displayName": s, "headline": s, "bio": s, "institution": s, "major": s,
             "gradYear": {"type": "integer", "minimum": 1990, "maximum": 2040}, "position": s,
             "targetCareerId": {"type": "string", "enum": [*career_ids, ""]},
+            "targetCareerOther": s,
             "skills": arr, "interests": arr, "strengths": arr, "growthAreas": arr,
             "contributions": {"type": "array", "maxItems": 6, "items": {"type": "object", "properties": {
                 "title": s, "type": {"type": "string", "enum": ["project", "coursework", "professional", "other"]},
@@ -85,6 +89,9 @@ def parse(text: str) -> dict:
         "education": {"institution": d.institution.strip(), "major": d.major.strip(), "gradYear": d.gradYear},
         "position": d.position.strip(),
         "targetCareerId": d.targetCareerId if growth_api.career_exists(d.targetCareerId) else None,
+        # D-55: an unlisted career is kept as Other when allowed (the student reviews the draft before saving).
+        "targetCareerOther": (d.targetCareerOther.strip()[:60] or None)
+        if not growth_api.career_exists(d.targetCareerId) and policies.get("CAREER_OTHER") else None,
         "skills": _clip(d.skills), "interests": _clip(d.interests, k=10), "strengths": _clip(d.strengths, k=8),
         "growthAreas": _clip(d.growthAreas, k=5), "featuredContributions": contribs,
     }

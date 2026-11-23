@@ -59,6 +59,9 @@ POLICIES: tuple[PolicyDef, ...] = (
     P("MAX_ACTIVE_WISHES", "D-53", "wish", "Waleed", "int", 0, "Most active wishes per user (0 = unlimited).",
       min=0, max=50, public=True),
     # Module 3: Activity, Evidence & Growth (Christina Phan)
+    P("CAREER_OTHER", "D-55", "growth", "Christina Phan", "bool", True,
+      "With the taxonomy skill model, a student whose career isn't in data/catalog.json may type it (Other); their own "
+      "profile skills are then tracked, with no role tier. Off: they must pick a listed career.", public=True),
     P("SKILL_MODEL", "D-08", "growth", "Christina Phan", "choice", "taxonomy",
       "Skills come from the career taxonomy in data/catalog.json, or from the user's free-form profile skills.",
       ("taxonomy", "freeform"), public=True),

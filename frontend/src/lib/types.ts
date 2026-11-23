@@ -4,8 +4,9 @@ export type Tier = "Not started" | "Familiar" | "Proficient" | "Demonstrated" | 
 
 export type Contribution = { id?: string | null; title: string; type: "project" | "coursework" | "professional" | "other"; description: string; verificationStatus: "self_reported" | "verified"; evidenceId?: string | null };
 export type ProfessionalState = {
-  schemaVersion: "0.1"; userId: string; handle: string | null; displayName: string; headline: string; bio: string;
+  schemaVersion: "0.2"; userId: string; handle: string | null; displayName: string; headline: string; bio: string;
   education: { institution: string; major: string; gradYear?: number | null }; position: string; targetCareerId: string | null;
+  targetCareerOther?: string | null;  // D-55: typed when the career isn't listed
   skills: string[]; interests: string[]; strengths: string[]; growthAreas: string[]; featuredContributions: Contribution[];
   onboardingCompletedAt: string | null; version: number;
 };

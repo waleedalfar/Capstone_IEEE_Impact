@@ -113,7 +113,7 @@ Each category is shown as a 50px tinted circle with a 25px icon. Six categories 
 - No dark mode.
 
 ## Copy
-- Written for senior ASU CS students: direct and specific.
+- Written for senior ASU engineering students of any discipline (mechanical, electrical, civil, chemical, biomedical, industrial, aerospace, computer, software...): direct and specific. Examples should not assume the reader writes code.
 - **No emoji.**
 - **Never say "AI" or "smart" in the interface.** Say "moves", "options", "review", "score", "feedback".
 - A frontend test checks string literals for banned words.

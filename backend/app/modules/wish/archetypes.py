@@ -61,7 +61,7 @@ quiz = [
         "answers": [
             {
                 "id": "a",
-                "label": "Try a different approach in code",
+                "label": "Try a different approach to it",
                 "scores": {
                     "builder": 2
                 }
@@ -88,7 +88,7 @@ quiz = [
         "answers": [
             {
                 "id": "a",
-                "label": "A small thing I can ship today",
+                "label": "A small thing I can finish today",
                 "scores": {
                     "builder": 1,
                     "explorer": 1

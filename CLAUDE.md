@@ -40,7 +40,7 @@ This codebase was started from the `wish-engine` branch. The other modules were 
   - Only the Event_Ecosystem design. Tokens are in `frontend/src/design/tokens.css`; never use raw hex in components.
   - Never nest a `<button>` in a link; use `ButtonLink`.
 - **Copy**
-  - Written for senior ASU CS students. No emoji.
+  - Written for senior ASU engineering students of any discipline (not only CS). No emoji.
   - Never "AI" or "smart" in the UI (`frontend/src/test/copy.test.ts` checks this).
 - **Data**
   - Reads never write. GrowthState is computed from the ledger. Points are append-only, with `rules_version` and `policy_snapshot`.

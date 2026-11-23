@@ -131,7 +131,7 @@ export function LogEvidenceButton({ kind = "primary", className = "", label = "L
                     onSubmitted={(e) => { setDone(e); onLogged?.(); }} />
                 ) : data.skills.length === 0 ? (
                   <div className="flex flex-col items-start gap-3 rounded-lg bg-white p-5">
-                    <p className="text-[15px] text-text">Past work is scored against a skill you track. Choose a target career on your profile first.</p>
+                    <p className="text-[15px] text-text">Past work is scored against a skill you track. Choose a target career, or add your skills, on your profile first.</p>
                     <ButtonLink to="/profile">Open your profile</ButtonLink>
                   </div>
                 ) : (

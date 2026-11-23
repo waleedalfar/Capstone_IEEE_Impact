@@ -75,12 +75,12 @@ export function EvidenceForm({ selectedMoveId, wishId, skillChoices, revisionOf,
         <Chip on={kind === "file"} onClick={() => setKind("file")}>File</Chip>
         <Chip on={kind === "text"} onClick={() => setKind("text")}>Write it up</Chip>
       </ChipRow>
-      {kind === "link" && <Field label="Link" hint="A repo, doc, post, or anything public."><Input type="url" value={url} placeholder="https://github.com/..." onChange={(e) => setUrl(e.target.value)} /></Field>}
+      {kind === "link" && <Field label="Link" hint="A report, CAD model, video, repo, post, or anything public."><Input type="url" value={url} placeholder="https://..." onChange={(e) => setUrl(e.target.value)} /></Field>}
       {kind === "file" && (
         <div className="flex items-center gap-3">
-          <input ref={input} type="file" className="hidden" accept=".pdf,.docx,.txt,.png,.jpg,.jpeg" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          <input ref={input} type="file" className="hidden" accept=".pdf,.docx,.pptx,.xlsx,.txt,.png,.jpg,.jpeg" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
           <Button kind="secondary" onClick={() => input.current?.click()}>{file ? "Change file" : "Choose a file"}</Button>
-          <span className="truncate text-sm text-secondary">{file ? file.name : "PDF, Word, text or image, up to 10 MB"}</span>
+          <span className="truncate text-sm text-secondary">{file ? file.name : "PDF, Word, slides, spreadsheet, text or image, up to 10 MB"}</span>
         </div>
       )}
       {userTags && (
@@ -90,7 +90,7 @@ export function EvidenceForm({ selectedMoveId, wishId, skillChoices, revisionOf,
           <Field label="Difficulty"><Select value={t.difficulty} onChange={(v) => setT({ ...t, difficulty: v })} options={DIFFICULTIES.map((d) => ({ value: d, label: cap(d) }))} /></Field>
         </div>
       )}
-      <Field label="What you did and what came of it" hint="The rubric reads this, plus the text of a PDF, Word or text file. It can't open links.">
+      <Field label="What you did and what came of it" hint="The rubric reads this, plus the text of a PDF, Word, slides, spreadsheet or text file. It can't open links or see images, so describe them here.">
         <TextArea rows={4} maxLength={4000} value={summary} onChange={(e) => setSummary(e.target.value)} />
       </Field>
       {error && <ErrorNote>{error}</ErrorNote>}

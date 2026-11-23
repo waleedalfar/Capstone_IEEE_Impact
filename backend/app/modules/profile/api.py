@@ -16,7 +16,7 @@ def to_prompt_profile(state: ProfessionalState, mode: str, career_name: str | No
     if mode == "off":
         return None
     out = {
-        "targetCareer": career_name or state.targetCareerId, "major": state.education.major, "position": state.position,
+        "targetCareer": career_name or state.targetCareerOther or state.targetCareerId, "major": state.education.major, "position": state.position,
         "skills": state.skills, "interests": state.interests, "strengths": state.strengths, "growthAreas": state.growthAreas,
     }
     if mode == "full":
@@ -70,7 +70,8 @@ async def search_people(query: str, exclude_user_id: str, limit: int = 20) -> li
     pat = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
     async with db.read() as c:
         rows = (await c.execute(
-            select(profiles.c.user_id, profiles.c.handle, profiles.c.display_name, profiles.c.headline, profiles.c.target_career_id)
+            select(profiles.c.user_id, profiles.c.handle, profiles.c.display_name, profiles.c.headline, profiles.c.target_career_id,
+                   profiles.c.target_career_other)
             .where(profiles.c.handle.is_not(None), profiles.c.onboarding_completed_at.is_not(None),
                    profiles.c.user_id != exclude_user_id,
                    profiles.c.handle.ilike(pat, escape="\\") | profiles.c.display_name.ilike(pat, escape="\\"))
@@ -78,7 +79,7 @@ async def search_people(query: str, exclude_user_id: str, limit: int = 20) -> li
             .order_by((func.lower(profiles.c.handle) != q), ~profiles.c.handle.ilike(q + "%"), profiles.c.handle)
             .limit(limit))).all()
     return [{"userId": str(r.user_id), "handle": r.handle, "displayName": r.display_name or r.handle, "headline": r.headline,
-             "targetCareerId": r.target_career_id} for r in rows]
+             "targetCareerId": r.target_career_id, "targetCareerOther": r.target_career_other} for r in rows]
 
 
 async def user_for_handle(handle: str) -> str | None:

@@ -23,13 +23,22 @@ async def get_growth_state(user_id: str) -> GrowthState:
 
 
 async def allowed_skills(user_id: str, career_id: str | None, profile_skills: list[str]) -> list[dict]:
-    """Skills a move may be tagged with (D-08): the target career's list, or the user's own skills when freeform."""
+    """Skills a move may be tagged with (D-08): the target career's list, or the user's own skills when freeform, or
+    when their career isn't listed (D-55, CAREER_OTHER)."""
     from .scoring import slug
 
     if policies.get("SKILL_MODEL") == "taxonomy":
         c = catalog.career(career_id)
-        return [{"id": s["id"], "name": s["name"]} for s in c["skills"]] if c else []
-    return [{"id": slug(s), "name": s} for s in profile_skills] or [{"id": "general", "name": "General"}]
+        if c:
+            return [{"id": s["id"], "name": s["name"]} for s in c["skills"]]
+        if not policies.get("CAREER_OTHER"):
+            return []
+    return [{"id": slug(s), "name": s} for s in own_skills(profile_skills)]
+
+
+def own_skills(profile_skills: list[str]) -> list[str]:
+    """The skills tracked when they come from the profile: the user's own, or "General" if they listed none."""
+    return list(profile_skills) or ["General"]
 
 
 async def recent_outcomes(user_id: str, wish_selected_move_ids: list[str]) -> list[dict]:

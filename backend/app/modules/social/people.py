@@ -59,7 +59,7 @@ async def search(me: str, query: str) -> list[dict]:
     found = await _profile().search_people(query, me)
     rows = await _rows_with(me, [p["userId"] for p in found])
     return [{"handle": p["handle"], "displayName": p["displayName"], "headline": p["headline"],
-             "targetCareer": _growth().career_name(p["targetCareerId"]),
+             "targetCareer": _growth().career_name(p["targetCareerId"]) or p.get("targetCareerOther"),
              "connection": _status(rows.get(p["userId"]), me)} for p in found]
 
 
@@ -82,7 +82,7 @@ async def profile(me: str, handle: str) -> dict:
         "handle": state.handle, "displayName": state.displayName or state.handle, "headline": state.headline, "bio": state.bio,
         "position": state.position, "education": {"institution": state.education.institution, "major": state.education.major,
                                                   "gradYear": state.education.gradYear},
-        "targetCareer": _growth().career_name(state.targetCareerId), "skills": state.skills, "interests": state.interests,
+        "targetCareer": _growth().career_name(state.targetCareerId) or state.targetCareerOther, "skills": state.skills, "interests": state.interests,
         "contributions": [{"title": c.title, "type": c.type, "description": c.description, "verified": c.verificationStatus == "verified"}
                           for c in state.featuredContributions],
         "growth": {

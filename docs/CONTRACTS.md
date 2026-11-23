@@ -39,7 +39,7 @@ Built from the `Professional-State` branch's model. Changes from that model are 
 
 | Field | Type | Notes |
 |---|---|---|
-| schemaVersion | `"0.1"` | |
+| schemaVersion | `"0.2"` | 0.2 added `targetCareerOther` |
 | userId | uuid | Supabase `auth.users.id` |
 | handle | string | unique, `^[a-z0-9_]{3,24}$`, used to invite buddies |
 | displayName | string ≤80 | never sent to the model (D-06) |
@@ -47,7 +47,8 @@ Built from the `Professional-State` branch's model. Changes from that model are 
 | bio | string ≤1000 | never sent to the model in `summary` mode |
 | education | `{institution ≤120, major ≤120, gradYear? int}` | institution is never sent to the model |
 | position | string ≤80 | e.g. "Student", "Intern" |
-| targetCareerId | string | a career id from `data/catalog.json` (D-08) |
+| targetCareerId | string or null | a career id from `data/catalog.json` (D-08) |
+| targetCareerOther | string ≤60 or null | **0.2:** the career the student typed when theirs isn't listed (D-55); null whenever `targetCareerId` is set. Their own `skills` are then tracked |
 | skills | string[] ≤30, each ≤40 | self-reported; validated skills live in GrowthState |
 | interests | string[] ≤20 | |
 | strengths | string[] ≤10 | **new**, from the backbone diagram |
@@ -59,7 +60,7 @@ Built from the `Professional-State` branch's model. Changes from that model are 
 
 ```json
 {
-  "schemaVersion": "0.1",
+  "schemaVersion": "0.2",
   "userId": "7c1e0b9a-3f2d-4a51-9a0e-1b2c3d4e5f60",
   "handle": "sam_r",
   "displayName": "Sam Rivera",
@@ -68,6 +69,7 @@ Built from the `Professional-State` branch's model. Changes from that model are 
   "education": { "institution": "Arizona State University", "major": "Computer Science", "gradYear": 2027 },
   "position": "Student",
   "targetCareerId": "data_analyst",
+  "targetCareerOther": null,
   "skills": ["Python", "SQL", "pandas"],
   "interests": ["sports analytics"],
   "strengths": ["explaining results clearly"],

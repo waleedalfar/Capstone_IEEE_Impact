@@ -6,7 +6,7 @@ import { ApiError, get, post, put, upload } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useConfig } from "@/lib/config";
 import type { ProfessionalState } from "@/lib/types";
-import { BackgroundFields, BasicsFields, ContributionsFields, emptyDraft, fromState, mergeImport, SkillsFields, toPayload, type Draft } from "./ProfileForm";
+import { BackgroundFields, BasicsFields, careerLabel, ContributionsFields, emptyDraft, fromState, mergeImport, SkillsFields, toPayload, type Draft } from "./ProfileForm";
 
 const STEPS = ["About you", "Background", "Skills and goals", "Your work", "Review"];
 
@@ -86,7 +86,7 @@ export default function Onboarding() {
       setError(e instanceof ApiError ? e.message : "Couldn't save. Try again.");
     } finally { setBusy(false); }
   };
-  const career = catalog?.careers.find((c) => c.id === d.targetCareerId);
+  const career = careerLabel(d, catalog?.careers);
 
   return (
     <div className="mx-auto max-w-[820px]">
@@ -110,7 +110,7 @@ export default function Onboarding() {
           <div className="flex flex-col gap-3 text-[15px]">
             <p><strong>{d.displayName || "No name yet"}</strong>{d.handle ? ` · @${d.handle}` : ""}</p>
             {d.headline && <p className="text-secondary">{d.headline}</p>}
-            <p>Target career: <strong>{career?.name ?? "not chosen"}</strong></p>
+            <p>Target career: <strong>{career ?? "not chosen"}</strong></p>
             <p>Skills: {d.skills.join(", ") || "none yet"}</p>
             <p>Strengths: {d.strengths.join(", ") || "none yet"}</p>
             <p>Growth areas: {d.growthAreas.join(", ") || "none yet"}</p>

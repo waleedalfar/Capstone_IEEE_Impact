@@ -34,7 +34,7 @@ class Contribution(Contract):
 
 
 class ProfessionalState(Contract):
-    schemaVersion: Literal["0.1"] = "0.1"
+    schemaVersion: Literal["0.2"] = "0.2"  # 0.2: targetCareerOther (D-55)
     userId: str
     handle: str | None = None
     displayName: str = Field(default="", max_length=80)
@@ -43,6 +43,7 @@ class ProfessionalState(Contract):
     education: Education = Field(default_factory=Education)
     position: str = Field(default="", max_length=80)
     targetCareerId: str | None = None
+    targetCareerOther: str | None = Field(default=None, max_length=60)  # D-55: typed when the career isn't listed
     skills: list[Str40] = Field(default_factory=list, max_length=30)
     interests: list[Str40] = Field(default_factory=list, max_length=20)
     strengths: list[Str40] = Field(default_factory=list, max_length=10)
