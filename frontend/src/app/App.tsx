@@ -11,6 +11,7 @@ const Callback = lazy(() => import("@/modules/auth/Callback"));
 const ResetPassword = lazy(() => import("@/modules/auth/ResetPassword"));
 const Onboarding = lazy(() => import("@/modules/profile/Onboarding"));
 const ProfilePage = lazy(() => import("@/modules/profile/ProfilePage"));
+const SettingsPage = lazy(() => import("@/modules/profile/SettingsPage"));
 const HomePage = lazy(() => import("@/modules/feed/HomePage"));
 const MovesPage = lazy(() => import("@/modules/wish/MovesPage"));
 const NewWish = lazy(() => import("@/modules/wish/NewWish"));
@@ -56,6 +57,7 @@ export function App() {
               <Route path="/admin" element={<BareShell><AdminPage /></BareShell>} />
               <Route path="/" element={<Shell><HomePage /></Shell>} />
               <Route path="/profile" element={<Shell><ProfilePage /></Shell>} />
+              <Route path="/settings" element={<Shell><SettingsPage /></Shell>} />
               <Route path="/moves" element={<Shell><MovesPage /></Shell>} />
               <Route path="/moves/new" element={<Shell><NewWish /></Shell>} />
               <Route path="/moves/:wishId" element={<Shell><WishPage /></Shell>} />

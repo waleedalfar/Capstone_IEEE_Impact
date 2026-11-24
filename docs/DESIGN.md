@@ -104,13 +104,16 @@ Each category is shown as a 50px tinted circle with a 25px icon. Six categories 
 | EmptyState, Skeleton, Toast | |
 | Icon | the branch's SVGs, renamed (`users.svg`, `user-tie.svg`, `bell.svg`, ...) |
 
+## Theme
+
+Light mode is the default. The signed-in profile menu links to a dedicated **Settings** page, which currently contains the **Dark mode** switch. It applies a dark palette through the same design tokens and saves the choice in browser storage. White and black utility surfaces are remapped in dark mode so module pages stay readable without changing their component layouts.
+
 ## Motion and focus
 - `transition-colors` on chips and rows.
 - `hover:scale-105` on round icon buttons.
 - `transition-shadow` on cards.
 - Smooth scroll.
 - Focus ring: `focus-visible:outline-2 outline-[--color-primary]`.
-- No dark mode.
 
 ## Copy
 - Written for senior ASU CS students: direct and specific.
