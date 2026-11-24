@@ -7,7 +7,7 @@ import { Avatar, useDirectoryOn, usePeopleSearch } from "@/modules/social/people
 
 const NAV = [
   { to: "/", label: "Home", end: true },
-  { to: "/profile", label: "Profile" },
+  { to: "/profile", label: "My profile" },
   { to: "/moves", label: "Moves" },
   { to: "/growth", label: "Growth" },
   { to: "/buddies", label: "Buddies" },
@@ -142,7 +142,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {menu && (
               <div className="absolute right-0 top-14 w-56 rounded-xl border border-border bg-white p-2 text-sm shadow-lg">
                 <p className="truncate px-3 py-2 text-xs text-secondary">{me?.displayName || me?.email}{me?.handle ? ` · @${me.handle}` : ""}</p>
-                <Link to="/profile" className="block rounded-lg px-3 py-2 hover:bg-search">View profile</Link>
+                <Link to="/profile" className="block rounded-lg px-3 py-2 hover:bg-search">View my profile</Link>
                 <Link to="/buddies" className="block rounded-lg px-3 py-2 hover:bg-search">Buddies and reviews</Link>
                 <Link to="/settings" className="block rounded-lg px-3 py-2 hover:bg-search">Settings</Link>
                 <button type="button" className="block w-full rounded-lg px-3 py-2 text-left hover:bg-search" onClick={async () => { await signOut(); nav("/auth/sign-in"); }}>Sign out</button>

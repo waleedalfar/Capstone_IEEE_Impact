@@ -34,9 +34,9 @@ async function newPage(browser: import("playwright-core").Browser) {
 async function onboard(p: Page, name: string, handle: string, career: string | { other: string } = "data_analyst") {
   if (policy.ONBOARDING_REQUIRED === false) await p.getByRole("link", { name: "Finish profile" }).click();  // D-01: Home reminds
   await p.getByText("Where are you now?").waitFor();
-  await p.getByLabel("Name").waitFor();  // the form appears once the saved profile has loaded
-  await p.getByLabel("Name").fill(name);
-  await p.getByLabel("Handle").fill(handle);
+  await p.getByLabel("Name", { exact: true }).waitFor();  // the form appears once the saved profile has loaded
+  await p.getByLabel("Name", { exact: true }).fill(name);
+  await p.getByLabel("Username").fill(handle);
   await p.getByLabel("Headline").fill("CS senior building data tools");
   await shot(p, `onboarding-${handle.split("_")[0]}`);
   await p.getByRole("button", { name: "Next" }).click();
@@ -48,10 +48,10 @@ async function onboard(p: Page, name: string, handle: string, career: string | {
     await p.getByLabel("Your target career").fill(career.other);
   }
   await p.getByRole("button", { name: "Next" }).click();
-  const skills = p.getByPlaceholder("MATLAB");
+  const skills = p.getByLabel("Search skills", { exact: true });
   for (const s of typeof career === "string" ? ["SQL", "Python"] : ["MATLAB", "Radiation safety"]) { await skills.fill(s); await skills.press("Enter"); }
-  await p.getByPlaceholder("technical writing").fill("statistics");
-  await p.getByPlaceholder("technical writing").press("Enter");
+  await p.getByPlaceholder("statistics").fill("statistics");
+  await p.getByPlaceholder("statistics").press("Enter");
   await p.getByRole("button", { name: "Next" }).click();
   await p.getByRole("button", { name: "Next" }).click();
   await p.getByRole("button", { name: "Finish and go to Home" }).click();
