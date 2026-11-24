@@ -33,7 +33,7 @@ export default function GrowthPage() {
   const openLocked: Unlock | undefined = g.lockedOpportunities.find((u) => u.opportunityId === openingId);
   return (
     <div className="flex flex-col gap-6">
-      <PageTitle sub={career ? `Tracked against ${career.name}. Scoring rules ${g.rulesVersion}.` : "Choose a target career on your profile to track skills."}>Growth</PageTitle>
+      <PageTitle sub={career ? `Tracked against ${career.name}. Scoring rules ${g.rulesVersion}.` : g.skills.length ? `Tracked against the skills on your profile. Scoring rules ${g.rulesVersion}.` : "Choose a target career on your profile to track skills."}>Growth</PageTitle>
       <div className="grid gap-8 lg:grid-cols-[424px_minmax(0,738px)]">
         <aside className="flex flex-col gap-5 rounded-xl border border-border bg-panel px-4 pb-8 pt-[31px]">
           <div className="text-center">
@@ -71,7 +71,7 @@ export default function GrowthPage() {
         <section className="flex min-w-0 flex-col gap-6">
           <Panel>
             <PanelTitle count={g.skills.length}>Skills</PanelTitle>
-            {g.skills.length === 0 ? <Empty>No skills yet. <Link className="text-primary" to="/profile">Choose a target career.</Link></Empty> : (
+            {g.skills.length === 0 ? <Empty>No skills yet. <Link className="text-primary" to="/profile">Choose a target career, or add your skills.</Link></Empty> : (
               <ul className="flex flex-col">
                 {g.skills.map((s) => (
                   <li key={s.skillId} className="flex flex-col gap-2 border-b border-black px-2.5 py-4">

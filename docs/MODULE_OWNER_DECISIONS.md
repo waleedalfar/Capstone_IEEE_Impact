@@ -139,8 +139,13 @@ Your scoring formulas and constants are kept exactly. Base points, difficulty mu
 
 ### D-08 Target career is chosen in the profile
 - **Before:** a career dropdown on your Career page.
-- **Now:** your same four careers and skill lists (moved into `data/catalog.json`). The user chooses the target career once, in their Module 1 profile.
+- **Now:** your four careers and skill lists (moved into `data/catalog.json`), plus engineering careers added on 2026-11-23 (mechanical, electrical, computer/embedded, civil, chemical, biomedical, industrial, aerospace), so the platform serves engineering students of any discipline. The user chooses the target career once, in their Module 1 profile.
 - **Setting:** `SKILL_MODEL` = **taxonomy** | freeform
+
+### D-55 A career that isn't on the list (new)
+- **Before:** only listed careers; anyone else had to pick one that isn't theirs, and was scored against its skills.
+- **Now:** with the career taxonomy (D-08), the profile's career picker has **Other**, where the student types their career. Their own profile skills are then tracked (as with freeform, "General" if they listed none), and they have no role tier, since that needs a list's core skills. Listed careers work exactly as before.
+- **Setting:** `CAREER_OTHER` = **on** | off (off: a listed career is required, as in your design)
 
 ### D-13 Real reviewers instead of simulated ones
 - **Before:** three fixed reviewer names picked by evidence id, whose rating was computed from the rubric score, so it only repeated it.
@@ -325,3 +330,4 @@ The app runs with the default in the last column until an owner answers.
 | 2026-11-09 | D-02 | `MOVES_PER_WISH` back to 1 after it was set to 3 on 2026-11-07. A wish holds several moves either way; 1 generates each after the last, so a dropped move costs one regeneration, and the next move follows how the last one went. | Waleed |
 | 2026-11-09 | D-03 | `NEXT_MOVE_GATE` default from validated to submitted: the next move opens once evidence is submitted. Validation still decides points, tiers and unlocks; it no longer holds up the path. | Waleed |
 | 2026-11-17 | D-54 | New: people directory, public profiles and connections (`PEOPLE_DIRECTORY`, default on). Also: evidence can be past work logged against a wish (no move status change, own reviewer invite); locked opportunities carry a how-to-unlock plan (GrowthState 0.2, SocialEvidence 0.2). | Christina Phan |
+| 2026-11-23 | D-08, D-55 | Open to engineering students of any discipline: eight engineering careers added to the catalog; new `CAREER_OTHER` (default on) lets a student type an unlisted career and track their own skills (ProfessionalState 0.2). Wish Engine prompts now address engineering students, not only CS; evidence files may also be slides (.pptx) and spreadsheets (.xlsx). | Waleed |

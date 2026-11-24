@@ -1,6 +1,6 @@
 # Product
 
-Impact++ helps a CS student turn "I want to ..." into small, real steps.
+Impact++ helps an engineering student, of any discipline, turn "I want to ..." into small, real steps.
 
 - Each step produces evidence of skill growth.
 - That evidence is confirmed by another person.
@@ -16,7 +16,7 @@ The product is one pipeline of five modules, each built by a different team memb
 | 4 | Human Roles & Social Support: invite a reviewer or tester, feedback, confirmation becomes evidence | Michael Hawes | SocialEvidence v0.1 |
 | 5 | Opportunity & Event Return: notifications, While You Were Away, best next move | JBarroqu | EventContext + BestNextMoveTrigger v0.1 |
 
-The audience is senior ASU computer science students.
+The audience is senior ASU engineering students of any discipline. A student picks their target career from the list (data/catalog.json: computing and engineering careers) or types their own under Other (D-55), and the move generator fits moves to their field.
 
 **Copy rules:**
 - No emoji.

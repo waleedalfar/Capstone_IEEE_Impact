@@ -1,5 +1,5 @@
 {
-  "_about": "Growth taxonomy (D-08, D-09, D-27). Careers, their skills (core skills count toward role tier, D-28) and the opportunities tiers unlock. Copied from Growth-Validation catalog.py @ c657bab; the static MOVES list is not used (D-29). Edit this file to add careers or opportunities.",
+  "_about": "Growth taxonomy (D-08, D-09, D-27). Careers, their skills (core skills count toward role tier, D-28) and the opportunities tiers unlock. Copied from Growth-Validation catalog.py @ c657bab; the static MOVES list is not used (D-29). Engineering careers added 2026-11-23 (D-08); a career not listed can be typed as Other (D-55). Edit this file to add careers or opportunities.",
   "careers": [
     {
       "id": "data_analyst",
@@ -41,6 +41,94 @@
         { "id": "security", "name": "Security Fundamentals", "core": true },
         { "id": "linux", "name": "Linux", "core": true },
         { "id": "incident", "name": "Incident Response", "core": true }
+      ]
+    },
+    {
+      "id": "mechanical_engineer",
+      "name": "Mechanical Engineer",
+      "skills": [
+        { "id": "cad", "name": "CAD Modeling", "core": true },
+        { "id": "mechanics", "name": "Mechanics & FEA", "core": true },
+        { "id": "thermal", "name": "Thermodynamics & Heat Transfer", "core": true },
+        { "id": "manufacturing", "name": "Manufacturing Processes", "core": true },
+        { "id": "matlab", "name": "MATLAB", "core": false }
+      ]
+    },
+    {
+      "id": "electrical_engineer",
+      "name": "Electrical Engineer",
+      "skills": [
+        { "id": "circuits", "name": "Circuit Design", "core": true },
+        { "id": "pcb", "name": "PCB Layout", "core": true },
+        { "id": "signals", "name": "Signals & Systems", "core": true },
+        { "id": "power", "name": "Power Systems", "core": true },
+        { "id": "lab_instruments", "name": "Lab Instruments", "core": false }
+      ]
+    },
+    {
+      "id": "embedded_engineer",
+      "name": "Computer / Embedded Systems Engineer",
+      "skills": [
+        { "id": "c_programming", "name": "C Programming", "core": true },
+        { "id": "microcontrollers", "name": "Microcontrollers", "core": true },
+        { "id": "digital_logic", "name": "Digital Logic & FPGAs", "core": true },
+        { "id": "rtos", "name": "Real-Time Systems", "core": true },
+        { "id": "debugging", "name": "Hardware Debugging", "core": false }
+      ]
+    },
+    {
+      "id": "civil_engineer",
+      "name": "Civil Engineer",
+      "skills": [
+        { "id": "structures", "name": "Structural Analysis", "core": true },
+        { "id": "autocad", "name": "AutoCAD & Civil 3D", "core": true },
+        { "id": "geotech", "name": "Geotechnical Engineering", "core": true },
+        { "id": "project_controls", "name": "Construction Project Controls", "core": true },
+        { "id": "codes", "name": "Building Codes", "core": false }
+      ]
+    },
+    {
+      "id": "chemical_engineer",
+      "name": "Chemical Engineer",
+      "skills": [
+        { "id": "process_design", "name": "Process Design", "core": true },
+        { "id": "transport", "name": "Transport Phenomena", "core": true },
+        { "id": "reaction", "name": "Reaction Engineering", "core": true },
+        { "id": "process_sim", "name": "Process Simulation", "core": true },
+        { "id": "lab_safety", "name": "Lab Safety", "core": false }
+      ]
+    },
+    {
+      "id": "biomedical_engineer",
+      "name": "Biomedical Engineer",
+      "skills": [
+        { "id": "medical_devices", "name": "Medical Device Design", "core": true },
+        { "id": "biomechanics", "name": "Biomechanics", "core": true },
+        { "id": "bio_signals", "name": "Biosignal Processing", "core": true },
+        { "id": "regulatory", "name": "Regulatory & Quality (FDA, ISO)", "core": true },
+        { "id": "cell_lab", "name": "Cell & Tissue Lab", "core": false }
+      ]
+    },
+    {
+      "id": "industrial_engineer",
+      "name": "Industrial / Systems Engineer",
+      "skills": [
+        { "id": "lean", "name": "Lean & Six Sigma", "core": true },
+        { "id": "operations_research", "name": "Operations Research", "core": true },
+        { "id": "simulation", "name": "Systems Simulation", "core": true },
+        { "id": "supply_chain", "name": "Supply Chain", "core": true },
+        { "id": "ergonomics", "name": "Human Factors", "core": false }
+      ]
+    },
+    {
+      "id": "aerospace_engineer",
+      "name": "Aerospace Engineer",
+      "skills": [
+        { "id": "aerodynamics", "name": "Aerodynamics", "core": true },
+        { "id": "propulsion", "name": "Propulsion", "core": true },
+        { "id": "flight_dynamics", "name": "Flight Dynamics & Controls", "core": true },
+        { "id": "aero_structures", "name": "Aerospace Structures", "core": true },
+        { "id": "cfd", "name": "CFD", "core": false }
       ]
     }
   ],

@@ -13,13 +13,13 @@ from ... import db, policies
 from ...contracts import DomainEvent, GrowthState, Outcome, SocialEvidence
 from ...llm.errors import LlmUnavailable
 from ...platform import bus, jobs, storage
-from ...platform.textextract import DOCX, PDF, TXT, extract_text, sniff
+from ...platform.textextract import DOCX, PDF, PPTX, TXT, XLSX, extract_text, sniff
 from . import catalog, rubric, scoring
 from .tables import endorsements, evidence, score_events, unlocks
 
 log = logging.getLogger("impact.growth")
 MAX_FILE = 10 * 1024 * 1024
-ALLOWED_FILES = {PDF: "pdf", DOCX: "docx", TXT: "txt", "image/png": "png", "image/jpeg": "jpg"}
+ALLOWED_FILES = {PDF: "pdf", DOCX: "docx", PPTX: "pptx", XLSX: "xlsx", TXT: "txt", "image/png": "png", "image/jpeg": "jpg"}
 
 
 class GrowthError(ValueError):
@@ -83,6 +83,10 @@ async def _inputs(user_id: str) -> scoring.GrowthInputs:
     reviews = await _social().counting_reviews([e["id"] for e in evs])
     senior = {eid: any(t in policies.scoring_rules().senior_reviewer_tiers for t, _, _, _ in rs) for eid, rs in reviews.items()}
     taxonomy = policies.get("SKILL_MODEL") == "taxonomy"
+    career = catalog.career(state.targetCareerId) if taxonomy else None
+    # Profile skills are tracked when freeform, or when the career isn't listed (D-55).
+    from .api import own_skills
+    use_own = not taxonomy or (career is None and policies.get("CAREER_OTHER"))
     outcomes = []
     for e in [e for e in evs if e["status"] in ("validated", "needs_work", "awaiting_review")][:5]:
         pts = sum(float(r["points"]) for r in ledger if r["evidence_id"] == e["id"] and r["kind"] == "validated")
@@ -93,8 +97,8 @@ async def _inputs(user_id: str) -> scoring.GrowthInputs:
                                 feedbackSummary=(e["ai_feedback"] or "")[:240] or None,
                                 buddyComment=(rv[0][3] or None) if rv else None, peerConfirmed=e["peer_confirmed"]).model_dump())
     return scoring.GrowthInputs(
-        user_id=user_id, career=catalog.career(state.targetCareerId) if taxonomy else None,
-        freeform_skills=[] if taxonomy else state.skills, ledger=ledger, evidence=evs, senior_by_evidence=senior,
+        user_id=user_id, career=career,
+        freeform_skills=own_skills(state.skills) if use_own else [], ledger=ledger, evidence=evs, senior_by_evidence=senior,
         endorsed_skills={s for s, t in ends if t == "Verified"}, unlocked=unl, opportunities=catalog.opportunities(),
         outcomes=outcomes,
     )
@@ -264,7 +268,7 @@ async def submit(user_id: str, selected_move_id: str | None, artifact_type: str,
             raise GrowthError("The file is larger than 10 MB.", 413)
         mime = sniff(data)
         if mime not in ALLOWED_FILES:
-            raise GrowthError("Upload a PDF, Word, text, PNG or JPEG file.")
+            raise GrowthError("Upload a PDF, Word, PowerPoint, Excel, text, PNG or JPEG file.")
         file_text = extract_text(data, mime)
 
     if sm:

@@ -102,7 +102,7 @@ export function OpportunityDialog({ op, unlocked, evidence, onLogged, onClose }:
             <p className="text-xs text-secondary">
               {plan.skillName
                 ? <>Your closest skill is <strong className="text-navy">{plan.skillName}</strong> ({plan.currentTier}). Get it to {op?.tier}:</>
-                : "Choose a target career on your profile to start tracking skills."}
+                : "Choose a target career, or add your skills, on your profile to start tracking them."}
             </p>
           </div>
           <ol className="flex flex-col gap-2">{plan.steps.map((g) => <Step key={g.rule} g={g} ctx={{ evidence, skillId: plan.skillId, onLogged }} />)}</ol>

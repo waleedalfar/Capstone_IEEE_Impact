@@ -30,20 +30,26 @@ async function newPage(browser: import("playwright-core").Browser) {
   return p;
 }
 
-async function onboard(p: Page, name: string, handle: string) {
+/** career: a listed career id, or { other } to type one that isn't listed (D-55). */
+async function onboard(p: Page, name: string, handle: string, career: string | { other: string } = "data_analyst") {
   if (policy.ONBOARDING_REQUIRED === false) await p.getByRole("link", { name: "Finish profile" }).click();  // D-01: Home reminds
   await p.getByText("Where are you now?").waitFor();
-  await p.getByLabel("Name").waitFor();  // the form appears once the saved profile has loaded
-  await p.getByLabel("Name").fill(name);
-  await p.getByLabel("Handle").fill(handle);
+  await p.getByLabel("Name", { exact: true }).waitFor();  // the form appears once the saved profile has loaded
+  await p.getByLabel("Name", { exact: true }).fill(name);
+  await p.getByLabel("Username").fill(handle);
   await p.getByLabel("Headline").fill("CS senior building data tools");
   await shot(p, `onboarding-${handle.split("_")[0]}`);
   await p.getByRole("button", { name: "Next" }).click();
-  await p.getByLabel("Major").fill("Computer Science");
-  await p.locator("select").selectOption("data_analyst");
+  await p.getByLabel("Major").fill(typeof career === "string" ? "Computer Science" : "Nuclear Engineering");
+  if (typeof career === "string") {
+    await p.locator("select").selectOption(career);
+  } else {
+    await p.locator("select").selectOption("__other");
+    await p.getByLabel("Your target career").fill(career.other);
+  }
   await p.getByRole("button", { name: "Next" }).click();
-  const skills = p.getByPlaceholder("Python");
-  for (const s of ["SQL", "Python"]) { await skills.fill(s); await skills.press("Enter"); }
+  const skills = p.getByLabel("Search skills", { exact: true });
+  for (const s of typeof career === "string" ? ["SQL", "Python"] : ["MATLAB", "Radiation safety"]) { await skills.fill(s); await skills.press("Enter"); }
   await p.getByPlaceholder("statistics").fill("statistics");
   await p.getByPlaceholder("statistics").press("Enter");
   await p.getByRole("button", { name: "Next" }).click();
@@ -118,7 +124,7 @@ async function onboard(p: Page, name: string, handle: string) {
     await b.getByLabel("Email").fill(`priya-${id}@example.com`);
     await b.getByLabel("Password").fill("test-password-123");
     await b.getByRole("button", { name: "Create account" }).click();
-    await onboard(b, "Priya K", `priya_${id}`);
+    await onboard(b, "Priya K", `priya_${id}`, { other: "Nuclear engineer" });
     await b.getByRole("button", { name: "Open profile menu" }).click();
     await b.getByRole("button", { name: "Sign out" }).click();
 

@@ -64,7 +64,7 @@ The shape of each contract returned below is in `CONTRACTS.md`.
 |---|---|---|
 | GET | `/catalog` | Careers, skills, opportunities from `data/catalog.json` |
 | GET | `/growth` | Your GrowthState |
-| POST | `/evidence` | Multipart: `selectedMoveId` **or** `wishId`, `artifactType` (link/file/text), `url` or `file` or text, `summary`. Returns 202 with the evidence, status `scoring`. For a move, skill, type and difficulty come from the move. With `wishId` it's past work: `skillId` (one you track) is required, `activityType` and `difficulty` are optional, and no move's status changes. |
+| POST | `/evidence` | Multipart: `selectedMoveId` **or** `wishId`, `artifactType` (link/file/text), `url` or `file` (PDF, DOCX, PPTX, XLSX, TXT, PNG or JPEG, ≤10 MB) or text, `summary`. Returns 202 with the evidence, status `scoring`. For a move, skill, type and difficulty come from the move. With `wishId` it's past work: `skillId` (one you track) is required, `activityType` and `difficulty` are optional, and no move's status changes. |
 | GET | `/evidence?selectedMoveId=&wishId=&pastWork=true` | Your evidence, optionally for one move, one wish, or past work only |
 | GET | `/evidence/{id}` | One evidence item: rubric criteria, feedback, status, points |
 | POST | `/evidence/{id}/revise` | Submit a revision, which creates a new row with `revision_of` |

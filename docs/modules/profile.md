@@ -23,6 +23,7 @@
 | Proper columns + a `contributions` table instead of a JSON blob | Queryable, validated, and other modules can rely on it | DATA_MODEL |
 | Added `strengths` | It's in the backbone diagram and was missing | D-44 |
 | Added `targetCareerId` | Growth tracks skills against a career (Module 3) | D-08, D-10 |
+| Added `targetCareerOther` | A student whose career isn't listed types it; their own skills are tracked | D-55 |
 | Added a unique `handle` | Buddies invite each other by handle (Module 4) | D-51 |
 | Removed the "Alex Morgan" defaults | A missing field silently became fake data, and GET returned a fake profile when none existed | D-44 |
 | Only the server can set `verified` | Users could mark their own contributions verified | D-44, D-45 |

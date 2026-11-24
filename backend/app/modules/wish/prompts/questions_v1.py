@@ -7,7 +7,7 @@ from ....llm.validate import ValidationError, issues, strip_fences
 from .text import QUESTIONS_SYSTEM
 
 # Bump on any edit to the prompt or schema.
-QUESTIONS_VERSION = "questions.v1"
+QUESTIONS_VERSION = "questions.v2"  # v2 2026-11-23: engineering audience
 QUESTIONS_TEMPERATURE = 0.7
 
 questions_json_schema = {

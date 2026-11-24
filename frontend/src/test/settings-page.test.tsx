@@ -39,11 +39,19 @@ it("shows the Impact++ wordmark only once in the auth header", () => {
 
 it("persists dark mode from the dedicated Settings page", () => {
   render(<MemoryRouter><SettingsPage /></MemoryRouter>);
+  expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
   const toggle = screen.getByRole("switch", { name: "Dark mode" });
   expect(toggle).toHaveAttribute("aria-checked", "false");
+  const knob = toggle.querySelector(".theme-switch-knob");
+  expect(knob).toHaveClass("left-[18px]");
   act(() => fireEvent.click(toggle));
   expect(toggle).toHaveAttribute("aria-checked", "true");
-  expect(toggle.querySelector(".theme-switch-knob")).toHaveClass("left-0.5");
+  expect(knob).toHaveClass("left-0.5");
   expect(document.documentElement.dataset.theme).toBe("dark");
   expect(storage.get("impact.theme")).toBe("dark");
+  act(() => fireEvent.click(toggle));
+  expect(toggle).toHaveAttribute("aria-checked", "false");
+  expect(knob).toHaveClass("left-[18px]");
+  expect(document.documentElement.dataset.theme).toBe("light");
+  expect(storage.get("impact.theme")).toBe("light");
 });

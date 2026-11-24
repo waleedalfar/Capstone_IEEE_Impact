@@ -140,7 +140,7 @@ async def test_full_loop(api, users):
         assert ev3["status"] in ("validated", "needs_work") and ev3["peerConfirmed"] is None
 
     # Contracts over HTTP for other teams
-    assert (await api.get("/api/v1/integrations/professional-state", headers=a["h"])).json()["schemaVersion"] == "0.1"
+    assert (await api.get("/api/v1/integrations/professional-state", headers=a["h"])).json()["schemaVersion"] == "0.2"
     assert (await api.get(f"/api/v1/integrations/selected-move/{sm['selectedMoveId']}", headers=c["h"])).status_code == 404
 
 
