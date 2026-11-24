@@ -9,6 +9,7 @@ EventName = Literal[
     "ProfileUpdated", "MoveSelected", "NextMoveReady",
     "EvidenceSubmitted", "EvidenceScored", "EvidenceValidated", "EvidenceNeedsWork", "TierReached", "UnlockGranted",
     "InvitationCreated", "InvitationAccepted", "InvitationDeclined", "FeedbackSubmitted",
+    "ConnectionRequested", "ConnectionAccepted",
 ]
 
 

@@ -1,9 +1,11 @@
 """Growth routes (docs/API.md, Module 3)."""
+import re
+
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse
 
 from ...platform.auth import CurrentUser, User
-from ...platform.http import err, ok
+from ...platform.http import UUID_RE, err, ok
 from ...platform.rate_limit import limited, rules
 from ...platform.security import client_ip
 from . import catalog, service
@@ -27,27 +29,37 @@ async def integration(user: CurrentUser = User):
 
 
 @router.post("/evidence")
-async def submit(req: Request, selectedMoveId: str = Form(...), artifactType: str = Form(...), summary: str = Form(...),
+async def submit(req: Request, selectedMoveId: str | None = Form(None), wishId: str | None = Form(None),
+                 artifactType: str = Form(...), summary: str = Form(...),
                  url: str | None = Form(None), revisionOf: str | None = Form(None), skillId: str | None = Form(None),
                  activityType: str | None = Form(None), difficulty: str | None = Form(None),
                  file: UploadFile | None = File(None), user: CurrentUser = User):
     if rl := limited((rules.evidence_ip, client_ip(req)), (rules.evidence_user, user.id), (rules.evidence_all, "all")):
         return rl
+    # Evidence is for one selected move, or (no move) past work toward one wish.
+    if bool(selectedMoveId) == bool(wishId):
+        return err("Send selectedMoveId for a move, or wishId for past work toward a wish.")
+    if any(v and not re.fullmatch(UUID_RE, v) for v in (selectedMoveId, wishId, revisionOf)):
+        return err("Malformed id.")
     f = None
     if file is not None and file.filename:
         data = await file.read(service.MAX_FILE + 1)
         f = (file.filename, data)
     try:
         ev = await service.submit(user.id, selectedMoveId, artifactType, summary, url, f,
-                                  {"skillId": skillId, "activityType": activityType, "difficulty": difficulty}, revisionOf)
+                                  {"skillId": skillId, "activityType": activityType, "difficulty": difficulty}, revisionOf,
+                                  wish_id=wishId)
     except service.GrowthError as e:
         return err(str(e), e.status)
     return JSONResponse(ok(evidence=_json(ev)), status_code=202)
 
 
 @router.get("/evidence")
-async def list_evidence(selectedMoveId: str | None = None, user: CurrentUser = User):
-    return ok(evidence=[_json(e) for e in await service.list_evidence(user.id, selectedMoveId)])
+async def list_evidence(selectedMoveId: str | None = None, wishId: str | None = None, pastWork: bool = False,
+                        user: CurrentUser = User):
+    if any(v and not re.fullmatch(UUID_RE, v) for v in (selectedMoveId, wishId)):
+        return err("Malformed id.")
+    return ok(evidence=[_json(e) for e in await service.list_evidence(user.id, selectedMoveId, wishId, pastWork)])
 
 
 @router.get("/evidence/{evidence_id}")
@@ -58,7 +70,7 @@ async def get_evidence(evidence_id: str, user: CurrentUser = User):
     if own:
         return ok(evidence=_json(own), role="owner")
     owner = await service.owner_of(evidence_id)
-    if owner and await social_api.is_accepted_buddy(user.id, owner[1]):
+    if owner and await social_api.can_view_evidence(user.id, evidence_id, owner[1]):
         return ok(evidence=_json(await service.get_evidence(user.id, evidence_id, viewer_is_buddy=True)), role="buddy")
     return err("not found", 404)
 
@@ -88,7 +100,7 @@ async def file_url(evidence_id: str, user: CurrentUser = User):
     owner = await service.owner_of(evidence_id)
     if not owner:
         return err("not found", 404)
-    if owner[0] != user.id and not await social_api.is_accepted_buddy(user.id, owner[1]):
+    if owner[0] != user.id and not await social_api.can_view_evidence(user.id, evidence_id, owner[1]):
         return err("not found", 404)
     url = await service.file_url(evidence_id)
     return ok(url=url) if url else err("no file", 404)

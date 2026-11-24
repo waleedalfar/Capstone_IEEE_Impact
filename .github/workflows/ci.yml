@@ -1,11 +1,11 @@
-# CI/CD (docs/CI_CD.md). Every PR and push runs every check; "CI passed" is the one check branch protection needs.
-# A push to integration that passes deploys staging; a push to main that passes deploys production after approval.
+# CI (docs/CI_CD.md). Every push to main and every PR runs every check; "CI passed" is the one result that matters.
+# CI never deploys. Deploys are started by hand with the Deploy workflow, which refuses a commit unless CI passed on it.
 name: CI
 
 on:
   pull_request:
   push:
-    branches: [main, integration]
+    branches: [main]
   merge_group:
   workflow_dispatch:
 
@@ -13,8 +13,8 @@ permissions:
   contents: read
 
 concurrency:
-  # PRs: a new push cancels the older run. Branch pushes: every commit gets its own full run (unique group). Deploys
-  # can't go backwards: deploy.yml skips itself when a newer commit is already on the branch.
+  # PRs: a new push cancels the older run. Pushes to main: every commit gets its own full run (unique group), so each
+  # commit gets its own "CI passed" result for the Deploy workflow to check.
   group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
@@ -185,21 +185,3 @@ jobs:
         run: |
           echo "results: $RESULTS"
           for r in $RESULTS; do [ "$r" = success ] || { echo "::error::a required check did not pass ($r)"; exit 1; }; done
-
-  deploy-staging:
-    name: Deploy staging
-    needs: required
-    if: github.event_name == 'push' && github.ref == 'refs/heads/integration'
-    uses: ./.github/workflows/deploy.yml
-    with:
-      environment: staging
-    secrets: inherit
-
-  deploy-production:
-    name: Deploy production
-    needs: required
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    uses: ./.github/workflows/deploy.yml
-    with:
-      environment: production
-    secrets: inherit

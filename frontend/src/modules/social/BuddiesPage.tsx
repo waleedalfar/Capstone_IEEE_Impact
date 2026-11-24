@@ -1,12 +1,21 @@
-/* Module 4 (owner Michael Hawes): reviews waiting for you, invitations received and sent. */
+/* Module 4 (owner Michael Hawes): reviews waiting for you, invitations received and sent, and connections (D-54). */
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router";
 import { Button, ButtonLink, CategoryIcon, Chip, ChipRow, Empty, ErrorNote, PageTitle, Panel, PanelTitle, Tag } from "@/components/ui";
 import { ApiError, get, post } from "@/lib/api";
 import { ago } from "@/lib/format";
 import type { Invitation, ReviewItem } from "@/lib/types";
+import { ConnectionsTab } from "./ConnectionsTab";
+import { useDirectoryOn } from "./people";
 
 export default function BuddiesPage() {
-  const [tab, setTab] = useState<"reviews" | "received" | "sent">("reviews");
+  type Tab = "reviews" | "received" | "sent" | "connections";
+  const [params, setParams] = useSearchParams();
+  const directory = useDirectoryOn();
+  const fromUrl = params.get("tab") as Tab | null;
+  const [tab, setTabState] = useState<Tab>(fromUrl && (fromUrl !== "connections" || directory) ? fromUrl : "reviews");
+  useEffect(() => { if (fromUrl && (fromUrl !== "connections" || directory)) setTabState(fromUrl); }, [fromUrl, directory]);
+  const setTab = (t: Tab) => { setTabState(t); setParams(t === "reviews" ? {} : { tab: t }, { replace: true }); };
   const [queue, setQueue] = useState<ReviewItem[]>([]);
   const [received, setReceived] = useState<Invitation[]>([]);
   const [sent, setSent] = useState<Invitation[]>([]);
@@ -30,6 +39,7 @@ export default function BuddiesPage() {
         <Chip on={tab === "reviews"} onClick={() => setTab("reviews")}>To review ({todo.length})</Chip>
         <Chip on={tab === "received"} onClick={() => setTab("received")}>Invitations ({pending.length})</Chip>
         <Chip on={tab === "sent"} onClick={() => setTab("sent")}>Sent</Chip>
+        {directory && <Chip on={tab === "connections"} onClick={() => setTab("connections")}>Connections</Chip>}
       </ChipRow>
       {error && <ErrorNote>{error}</ErrorNote>}
       {tab === "reviews" && (
@@ -78,6 +88,7 @@ export default function BuddiesPage() {
           )}
         </Panel>
       )}
+      {tab === "connections" && directory && <ConnectionsTab initialQuery={params.get("q") ?? ""} />}
     </div>
   );
 }

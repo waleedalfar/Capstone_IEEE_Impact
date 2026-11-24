@@ -1,57 +1,63 @@
 import { useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router";
-import { Button, Chip, ChipRow, ErrorNote, Field, Input } from "@/components/ui";
+import { Button, ErrorNote, Field, Input } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { AuthCard, GoogleButton, OrLine } from "./AuthCard";
 
+export function signInErrorMessage(error: { code?: string; message?: string }) {
+  if (error.code === "invalid_credentials" || /invalid login credentials/i.test(error.message ?? "")) {
+    return "Email or password is incorrect. Check both fields and try again, or reset your password.";
+  }
+  return "We couldn't sign you in. Check your connection and try again.";
+}
+
+// Password sign-in only. Emailed sign-in links were removed: every email counts against Supabase's hourly email limit.
 export default function SignIn() {
   const { session } = useAuth();
   const [params] = useSearchParams();
   const next = params.get("next") || "/";
   const nav = useNavigate();
-  const [mode, setMode] = useState<"password" | "link">("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
   if (session) return <Navigate to={next} replace />;
 
   const redirect = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setBusy(true); setError(null);
-    if (mode === "password") {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) setError(error.message); else nav(next);
-    } else {
-      const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: redirect, shouldCreateUser: true } });
-      if (error) setError(error.message); else setSent(true);
+    const form = e.currentTarget;
+    const emailInput = form instanceof HTMLFormElement ? form.elements.namedItem("email") : null;
+    const passwordInput = form instanceof HTMLFormElement ? form.elements.namedItem("password") : null;
+    if (emailInput instanceof HTMLInputElement && !emailInput.validity.valid) {
+      setError(emailInput.validity.valueMissing ? "Enter your email address." : "Enter a valid email address.");
+      return;
     }
-    setBusy(false);
+    if (passwordInput instanceof HTMLInputElement && !passwordInput.validity.valid) {
+      setError("Enter your password.");
+      return;
+    }
+    setBusy(true); setError(null);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) setError(signInErrorMessage(error)); else nav(next);
+    } catch (error) {
+      setError(signInErrorMessage(error instanceof Error ? { message: error.message } : {}));
+    } finally {
+      setBusy(false);
+    }
   };
 
-  if (sent) {
-    return <AuthCard title="Check your email" sub={<>We sent a sign-in link to <strong>{email}</strong>. Open it on this device.</>}>
-      <Button kind="text" onClick={() => setSent(false)}>Use a different email</Button>
-    </AuthCard>;
-  }
   return (
     <AuthCard title="Sign in" sub="Pick up where you left off.">
       <GoogleButton onClick={() => supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: redirect } })} />
       <OrLine />
-      <ChipRow label="Sign-in method">
-        <Chip on={mode === "password"} onClick={() => setMode("password")}>Password</Chip>
-        <Chip on={mode === "link"} onClick={() => setMode("link")}>Email me a link</Chip>
-      </ChipRow>
-      <form className="mt-3 flex flex-col gap-4" onSubmit={submit}>
-        <Field label="Email"><Input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
-        {mode === "password" && (
-          <Field label="Password"><Input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
-        )}
+      <form className="flex flex-col gap-4" noValidate onSubmit={submit}>
+        <Field label="Email"><Input name="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
+        <Field label="Password"><Input name="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
         {error && <ErrorNote>{error}</ErrorNote>}
-        <Button type="submit" busy={busy}>{mode === "password" ? "Sign in" : "Send sign-in link"}</Button>
+        <Button type="submit" busy={busy}>Sign in</Button>
       </form>
       <div className="mt-5 flex flex-wrap justify-between gap-2 text-sm">
         <Link className="text-primary hover:opacity-60" to={`/auth/sign-up?next=${encodeURIComponent(next)}`}>Create an account</Link>

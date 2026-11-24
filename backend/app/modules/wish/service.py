@@ -95,6 +95,13 @@ async def list_wishes(user_id: str) -> list[dict]:
     return out
 
 
+async def wish_summary(user_id: str, wish_id: str) -> dict | None:
+    async with db.read() as c:
+        w = (await c.execute(select(wishes.c.id, wishes.c.text, wishes.c.status).where(
+            wishes.c.id == wish_id, wishes.c.user_id == user_id))).first()
+    return {"id": str(w.id), "text": w.text, "status": w.status} if w else None
+
+
 async def get_wish(user_id: str, wish_id: str) -> dict:
     ws = [w for w in await list_wishes(user_id) if w["id"] == wish_id]
     if not ws:

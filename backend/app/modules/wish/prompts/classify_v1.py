@@ -8,7 +8,7 @@ from ..vocab import DOMAINS, FOCUSES, Domain, Focus, WishType
 from .text import CLASSIFY_SYSTEM
 
 # Bump on any edit to the prompt or schema.
-CLASSIFY_VERSION = "classify.v1"
+CLASSIFY_VERSION = "classify.v2"  # v2 2026-11-23: engineering audience
 
 classify_json_schema = {
     "type": "object",

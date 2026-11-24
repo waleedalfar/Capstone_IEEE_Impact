@@ -67,7 +67,7 @@ erDiagram
 - `user_id uuid pk fk auth.users`
 - `handle citext unique` (`^[a-z0-9_]{3,24}$`; null until onboarding)
 - `display_name`, `headline`, `bio`
-- `education jsonb {institution, major, gradYear}`, `position`, `target_career_id text`
+- `education jsonb {institution, major, gradYear}`, `position`, `target_career_id text`, `target_career_other text` (≤60, D-55: a career typed when it isn't in the catalog)
 - `skills text[]`, `interests text[]`, `strengths text[]`, `growth_areas text[]`
 - `onboarding_completed_at timestamptz null`
 - `last_seen_at`, `previous_seen_at` (for While You Were Away)

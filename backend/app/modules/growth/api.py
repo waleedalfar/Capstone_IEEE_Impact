@@ -23,13 +23,22 @@ async def get_growth_state(user_id: str) -> GrowthState:
 
 
 async def allowed_skills(user_id: str, career_id: str | None, profile_skills: list[str]) -> list[dict]:
-    """Skills a move may be tagged with (D-08): the target career's list, or the user's own skills when freeform."""
+    """Skills a move may be tagged with (D-08): the target career's list, or the user's own skills when freeform, or
+    when their career isn't listed (D-55, CAREER_OTHER)."""
     from .scoring import slug
 
     if policies.get("SKILL_MODEL") == "taxonomy":
         c = catalog.career(career_id)
-        return [{"id": s["id"], "name": s["name"]} for s in c["skills"]] if c else []
-    return [{"id": slug(s), "name": s} for s in profile_skills] or [{"id": "general", "name": "General"}]
+        if c:
+            return [{"id": s["id"], "name": s["name"]} for s in c["skills"]]
+        if not policies.get("CAREER_OTHER"):
+            return []
+    return [{"id": slug(s), "name": s} for s in own_skills(profile_skills)]
+
+
+def own_skills(profile_skills: list[str]) -> list[str]:
+    """The skills tracked when they come from the profile: the user's own, or "General" if they listed none."""
+    return list(profile_skills) or ["General"]
 
 
 async def recent_outcomes(user_id: str, wish_selected_move_ids: list[str]) -> list[dict]:
@@ -62,8 +71,8 @@ async def evidence_for_review(evidence_id: str) -> dict | None:
     return await service.get_evidence("", evidence_id, viewer_is_buddy=True)
 
 
-async def evidence_owner(evidence_id: str) -> tuple[str, str] | None:
-    """(owner user id, selected move id)."""
+async def evidence_owner(evidence_id: str) -> tuple[str, str | None] | None:
+    """(owner user id, selected move id, or None for past-work evidence)."""
     return await service.owner_of(evidence_id)
 
 
@@ -73,6 +82,11 @@ async def evidence_file_url(evidence_id: str) -> str | None:
 
 async def list_evidence(user_id: str, selected_move_id: str | None = None) -> list[dict]:
     return await service.list_evidence(user_id, selected_move_id)
+
+
+async def get_own_evidence(user_id: str, evidence_id: str) -> dict | None:
+    """One piece of evidence if user_id owns it (public shape, with selectedMoveId and wishId)."""
+    return await service.get_evidence(user_id, evidence_id)
 
 
 async def is_validated_evidence(user_id: str, evidence_id: str) -> bool:

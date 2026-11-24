@@ -1,11 +1,11 @@
-# Impact++ (integration branch)
+# Impact++
 
 Five capstone modules joined into one product:
 - **Frontend:** React 19 + Vite + Tailwind 4 in `frontend/`.
 - **Backend:** one FastAPI service in `backend/app/`.
 - **Data and auth:** one Supabase project (Postgres, Auth, Storage), deployed as one Render web service.
 
-The branch was cut from `wish-engine`. The other modules were ported by hand (`docs/PROVENANCE.md`). The old Wish Engine notes are in `docs/wish-engine/CLAUDE.md`.
+This codebase was started from the `wish-engine` branch. The other modules were ported by hand (`docs/PROVENANCE.md`). The old Wish Engine notes are in `docs/wish-engine/CLAUDE.md`.
 
 ## Read first
 - `docs/README.md`: index and module owners.
@@ -17,9 +17,9 @@ The branch was cut from `wish-engine`. The other modules were ported by hand (`d
 - **Commits and pushes**
   - No `Co-Authored-By` or "Generated with Claude Code" lines in commits or PRs; plain messages.
   - Commit after each stage. Never push without being asked.
-  - Remote `capstone` = `waleedalfar/Capstone_IEEE_Impact` (moved from JBarroqu; the old URL redirects), branch `integration`.
+  - Remote `origin` = `waleedalfar/Capstone_IEEE_Impact` (moved from JBarroqu; the old URL redirects); it is the only remote. `main` is the only branch; push to it directly. (`integration` is retired.)
 - **CI must pass** (`docs/CI_CD.md`)
-  - Checks: "CI passed" and "Security passed". Staging deploys from `integration`, production from `main` after approval; only commits that pass deploy.
+  - Commit and push straight to `main`; CI ("CI passed") and Security run on every push. Nothing deploys on its own: Actions → Deploy → type `deploy`, which refuses a commit unless CI passed on it. Production only, no staging yet.
   - Before pushing: `npm run lint && npm test`. Pin new Actions to a full commit SHA with the version in a comment.
   - Runtime Python packages go in `backend/requirements.txt`; test and CI tools in `requirements-dev.txt`.
 - **Every switchable decision is a policy**
@@ -40,7 +40,7 @@ The branch was cut from `wish-engine`. The other modules were ported by hand (`d
   - Only the Event_Ecosystem design. Tokens are in `frontend/src/design/tokens.css`; never use raw hex in components.
   - Never nest a `<button>` in a link; use `ButtonLink`.
 - **Copy**
-  - Written for senior ASU CS students. No emoji.
+  - Written for senior ASU engineering students of any discipline (not only CS). No emoji.
   - Never "AI" or "smart" in the UI (`frontend/src/test/copy.test.ts` checks this).
 - **Data**
   - Reads never write. GrowthState is computed from the ledger. Points are append-only, with `rules_version` and `policy_snapshot`.

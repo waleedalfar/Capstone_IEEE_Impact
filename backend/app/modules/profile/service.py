@@ -20,7 +20,7 @@ def _row_to_state(p, contribs) -> ProfessionalState:
     return ProfessionalState(
         userId=str(p.user_id), handle=p.handle, displayName=p.display_name, headline=p.headline, bio=p.bio,
         education=Education(institution=edu.get("institution", ""), major=edu.get("major", ""), gradYear=edu.get("gradYear")),
-        position=p.position, targetCareerId=p.target_career_id, skills=list(p.skills or []),
+        position=p.position, targetCareerId=p.target_career_id, targetCareerOther=p.target_career_other, skills=list(p.skills or []),
         interests=list(p.interests or []), strengths=list(p.strengths or []), growthAreas=list(p.growth_areas or []),
         featuredContributions=[Contribution(id=str(c.id), title=c.title, type=c.type, description=c.description,
                                             verificationStatus=c.verification_status,
@@ -55,11 +55,16 @@ async def save(user_id: str, body: ProfessionalState, complete_onboarding: bool)
         raise ProfileError("That handle is taken.")
     if body.targetCareerId and not growth_api.career_exists(body.targetCareerId):
         raise ProfileError("Unknown target career.")
+    # D-55: a typed career only when none is picked from the list.
+    other = None if body.targetCareerId else (body.targetCareerOther or "").strip() or None
+    if other and not policies.get("CAREER_OTHER"):
+        raise ProfileError("Choose a target career from the list.")
     if complete_onboarding:
         if policies.get("HANDLE_REQUIRED") and not handle:
             raise ProfileError("Choose a handle so buddies can invite you.")
-        if policies.get("SKILL_MODEL") == "taxonomy" and not body.targetCareerId:
-            raise ProfileError("Choose a target career.")
+        if policies.get("SKILL_MODEL") == "taxonomy" and not body.targetCareerId and not other:
+            raise ProfileError("Choose a target career, or type yours under Other."
+                               if policies.get("CAREER_OTHER") else "Choose a target career.")
         if not body.displayName.strip():
             raise ProfileError("Add your name.")
 
@@ -79,7 +84,7 @@ async def save(user_id: str, body: ProfessionalState, complete_onboarding: bool)
         values = {
             "handle": handle, "display_name": body.displayName.strip(), "headline": body.headline.strip(),
             "bio": body.bio.strip(), "education": body.education.model_dump(), "position": body.position.strip(),
-            "target_career_id": body.targetCareerId, "skills": _clean_list(body.skills),
+            "target_career_id": body.targetCareerId, "target_career_other": other, "skills": _clean_list(body.skills),
             "interests": _clean_list(body.interests), "strengths": _clean_list(body.strengths),
             "growth_areas": _clean_list(body.growthAreas), "version": profiles.c.version + 1, "updated_at": func.now(),
         }

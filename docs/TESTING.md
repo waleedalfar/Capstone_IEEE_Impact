@@ -26,7 +26,7 @@ runs all of it, plus the integration tests against a real Supabase and the brows
 
 ## End-to-end flows
 1. Sign up with email and password, finish onboarding (resume import with the fake model), land on Home.
-2. Sign in with a magic link. The link is read from Mailpit's API.
+2. The second user signs out and back in with their password.
 3. Wish, then questions, then options. Reject as "Too big", reroll, and lock move 1. The feed shows "Move locked".
 4. Submit evidence. Pending points appear.
 5. **Two users:**

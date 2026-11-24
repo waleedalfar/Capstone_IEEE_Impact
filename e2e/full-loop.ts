@@ -1,7 +1,7 @@
 /**
  * End-to-end: two users through the whole product in headless Chrome (docs/TESTING.md).
  *   sign up -> onboarding -> Home -> wish -> questions -> options -> lock -> evidence -> invite buddy
- *   -> buddy signs in by magic link (Mailpit) -> accepts -> reviews -> points final -> feed -> move 2 opens
+ *   -> buddy signs back in with a password -> accepts -> reviews -> points final -> feed -> move 2 opens
  * Needs: supabase start, the API serving the built app with ENV=test LLM_FAKE=1 (npm run e2e:serve).
  * Usage: npx tsx e2e/full-loop.ts [--shots=dir]   (BASE_URL defaults to http://localhost:8000)
  * It follows the live policy values (GET /api/v1/config), so serving with owners' original choices, e.g.
@@ -12,7 +12,6 @@ import { chromium, type Page } from "playwright-core";
 
 const base = process.env.BASE_URL ?? "http://localhost:8000";
 const shots = process.argv.find((a) => a.startsWith("--shots="))?.slice(8);
-const mailpit = process.env.MAILPIT_URL ?? "http://127.0.0.1:54324";
 const id = Math.random().toString(36).slice(2, 7);
 const errors: string[] = [];
 const pages: Page[] = [];
@@ -31,40 +30,32 @@ async function newPage(browser: import("playwright-core").Browser) {
   return p;
 }
 
-async function onboard(p: Page, name: string, handle: string) {
+/** career: a listed career id, or { other } to type one that isn't listed (D-55). */
+async function onboard(p: Page, name: string, handle: string, career: string | { other: string } = "data_analyst") {
   if (policy.ONBOARDING_REQUIRED === false) await p.getByRole("link", { name: "Finish profile" }).click();  // D-01: Home reminds
   await p.getByText("Where are you now?").waitFor();
-  await p.getByLabel("Name").waitFor();  // the form appears once the saved profile has loaded
-  await p.getByLabel("Name").fill(name);
-  await p.getByLabel("Handle").fill(handle);
+  await p.getByLabel("Name", { exact: true }).waitFor();  // the form appears once the saved profile has loaded
+  await p.getByLabel("Name", { exact: true }).fill(name);
+  await p.getByLabel("Username").fill(handle);
   await p.getByLabel("Headline").fill("CS senior building data tools");
   await shot(p, `onboarding-${handle.split("_")[0]}`);
   await p.getByRole("button", { name: "Next" }).click();
-  await p.getByLabel("Major").fill("Computer Science");
-  await p.locator("select").selectOption("data_analyst");
+  await p.getByLabel("Major").fill(typeof career === "string" ? "Computer Science" : "Nuclear Engineering");
+  if (typeof career === "string") {
+    await p.locator("select").selectOption(career);
+  } else {
+    await p.locator("select").selectOption("__other");
+    await p.getByLabel("Your target career").fill(career.other);
+  }
   await p.getByRole("button", { name: "Next" }).click();
-  const skills = p.getByPlaceholder("Python");
-  for (const s of ["SQL", "Python"]) { await skills.fill(s); await skills.press("Enter"); }
+  const skills = p.getByLabel("Search skills", { exact: true });
+  for (const s of typeof career === "string" ? ["SQL", "Python"] : ["MATLAB", "Radiation safety"]) { await skills.fill(s); await skills.press("Enter"); }
   await p.getByPlaceholder("statistics").fill("statistics");
   await p.getByPlaceholder("statistics").press("Enter");
   await p.getByRole("button", { name: "Next" }).click();
   await p.getByRole("button", { name: "Next" }).click();
   await p.getByRole("button", { name: "Finish and go to Home" }).click();
   await p.getByRole("heading", { name: "Notifications" }).waitFor();
-}
-
-async function magicLink(email: string): Promise<string> {
-  for (let i = 0; i < 30; i++) {
-    const list = await (await fetch(`${mailpit}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`)).json();
-    const msg = list.messages?.[0];
-    if (msg) {
-      const full = await (await fetch(`${mailpit}/api/v1/message/${msg.ID}`)).json();
-      const m = String(full.Text ?? full.HTML).match(/https?:\/\/[^\s"<>]+verify[^\s"<>]+/);
-      if (m) return m[0].replace(/&amp;/g, "&");
-    }
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  throw new Error("no magic link email");
 }
 
 (async () => {
@@ -75,9 +66,9 @@ async function magicLink(email: string): Promise<string> {
     // ---- User A: password sign-up and onboarding (Module 1)
     const a = await newPage(browser);
     await a.goto(`${base}/`);
-    await a.getByRole("heading", { name: "Sign in" }).waitFor();
-    await shot(a, "signin");
-    await a.getByRole("link", { name: "Create an account" }).click();
+    await a.getByRole("heading", { name: "Impact++", level: 1 }).waitFor();
+    await shot(a, "landing");
+    await a.getByRole("link", { name: "Get started" }).click();
     await a.getByRole("heading", { name: "Create your account" }).waitFor();
     await a.getByLabel("Email").fill(`sam-${id}@example.com`);
     await a.getByLabel("Password").fill("test-password-123");
@@ -133,7 +124,7 @@ async function magicLink(email: string): Promise<string> {
     await b.getByLabel("Email").fill(`priya-${id}@example.com`);
     await b.getByLabel("Password").fill("test-password-123");
     await b.getByRole("button", { name: "Create account" }).click();
-    await onboard(b, "Priya K", `priya_${id}`);
+    await onboard(b, "Priya K", `priya_${id}`, { other: "Nuclear engineer" });
     await b.getByRole("button", { name: "Open profile menu" }).click();
     await b.getByRole("button", { name: "Sign out" }).click();
 
@@ -148,13 +139,11 @@ async function magicLink(email: string): Promise<string> {
     }
     await a.getByText("invited").waitFor();
 
-    // B comes back with a magic link (Mailpit)
+    // B signs back in with a password
     await b.getByRole("heading", { name: "Sign in" }).waitFor();
-    await b.getByRole("button", { name: "Email me a link" }).click();
     await b.getByLabel("Email").fill(`priya-${id}@example.com`);
-    await b.getByRole("button", { name: "Send sign-in link" }).click();
-    await b.getByText("Check your email").waitFor();
-    await b.goto(await magicLink(`priya-${id}@example.com`));
+    await b.getByLabel("Password").fill("test-password-123");
+    await b.getByRole("button", { name: "Sign in", exact: true }).click();
     await b.getByRole("heading", { name: "Notifications" }).waitFor({ timeout: 20_000 });
     await b.getByText(/invited you as a reviewer/).first().waitFor();
     await shot(b, "buddy-home");

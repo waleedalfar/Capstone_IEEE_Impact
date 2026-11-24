@@ -51,6 +51,10 @@ RULES: dict[str, Rule] = {
                                lambda r: "Invite someone else for this move.", lambda r: "/buddies"),
     "FeedbackSubmitted": Rule("feedback_received", "Social", lambda r: f"{r.get('buddyName', 'Your buddy')} left feedback",
                               lambda r: r.get("comment", "")[:140], lambda r: f"/growth/evidence/{r.get('evidenceId')}"),
+    "ConnectionRequested": Rule("connection_requested", "Social", lambda r: f"{r.get('requesterName', 'Someone')} wants to connect",
+                                lambda r: "Accept or decline in Buddies, Connections.", lambda r: "/buddies?tab=connections"),
+    "ConnectionAccepted": Rule("connection_accepted", "Social", lambda r: f"{r.get('addresseeName', 'Someone')} accepted your connection",
+                               lambda r: "See their profile.", lambda r: f"/people/{r.get('handle')}" if r.get("handle") else "/buddies?tab=connections"),
     "ProfileUpdated": Rule("profile_completed", "Pro", lambda r: "Profile complete",
                            lambda r: "Start a wish to get your first move.", lambda r: "/moves/new"),
 }

@@ -21,6 +21,11 @@ async def list_wishes(user_id: str) -> list[dict]:
     return await service.list_wishes(user_id)
 
 
+async def get_wish_summary(user_id: str, wish_id: str | None) -> dict | None:
+    """{id, text, status} of one of the user's wishes, or None. Growth uses it for past-work evidence."""
+    return await service.wish_summary(user_id, wish_id) if wish_id else None
+
+
 def register() -> None:
     """Wire the subscribers that let the wish module announce a newly opened step (D-03)."""
     for name in ("EvidenceSubmitted", "EvidenceScored", "EvidenceValidated", "EvidenceNeedsWork"):

@@ -14,6 +14,7 @@ profiles = Table(
     Column("education", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
     Column("position", Text, nullable=False, server_default=""),
     Column("target_career_id", Text),
+    Column("target_career_other", Text),  # D-55
     Column("skills", ARRAY(Text), nullable=False, server_default="{}"),
     Column("interests", ARRAY(Text), nullable=False, server_default="{}"),
     Column("strengths", ARRAY(Text), nullable=False, server_default="{}"),

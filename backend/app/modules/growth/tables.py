@@ -8,7 +8,8 @@ evidence = Table(
     "evidence", metadata,
     Column("id", Uuid, primary_key=True, server_default=text("gen_random_uuid()")),
     Column("user_id", Uuid, nullable=False),
-    Column("selected_move_id", Uuid, nullable=False),
+    Column("selected_move_id", Uuid),  # null for past-work evidence, which belongs to a wish instead
+    Column("wish_id", Uuid),
     Column("revision_of", Uuid),
     Column("skill_id", Text, nullable=False),
     Column("activity_type", Text, nullable=False),
