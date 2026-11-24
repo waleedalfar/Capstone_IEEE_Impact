@@ -94,6 +94,8 @@ The shape of each contract returned below is in `CONTRACTS.md`.
 | GET | `/feed?category=&unread=&cursor=` | FeedItems, newest first, paginated |
 | POST | `/feed/{id}/read` | Mark read. Send `{read:false}` to mark unread (Event_Ecosystem's read toggle). |
 | POST | `/feed/read-all` | Mark everything read |
+| POST | `/feed/{id}/delete` | Delete one read notification. Unread returns 409; another user's id returns 404. |
+| POST | `/feed/delete-read?chip=&q=` | Delete read notifications in the current list. `chip` and `q` match GET `/feed`. Returns `{deleted}`. |
 | GET | `/home` | `{eventContext, bestNextMove, activeMoves[], growthSummary, profileCard}` in one call. Opening Home counts as a visit (moves `last_seen_at` into `previous_seen_at`, D-39). |
 
 ## Admin (`/api/admin`, signed `wish_admin` cookie from `ADMIN_PASSWORD`, D-47)

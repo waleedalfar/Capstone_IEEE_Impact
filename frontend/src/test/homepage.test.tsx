@@ -177,3 +177,49 @@ it("keeps the read state across a fresh page load", async () => {
   await within(refreshedNotifications).findByRole("button", { name: "Mark unread: Follow up item" });
   expect(within(refreshedAside).queryByRole("button", { name: /Mark (read|unread): Follow up item/ })).not.toBeInTheDocument();
 });
+
+it("deletes one read notification and leaves an unread one in place", async () => {
+  render(
+    <MemoryRouter>
+      <HomePage />
+    </MemoryRouter>
+  );
+
+  const notifications = document.getElementById("notifications");
+  if (!notifications) throw new Error("Notifications panel was not rendered");
+  const panel = within(notifications);
+  const remove = await panel.findByRole("button", { name: "Delete: Follow up item" });
+  expect(remove).toBeDisabled();
+  expect(panel.queryByRole("button", { name: "Delete read" })).not.toBeInTheDocument();
+  fireEvent.click(remove);
+  expect(post).not.toHaveBeenCalledWith("/api/v1/feed/wywa-1/delete");
+
+  fireEvent.click(panel.getByRole("button", { name: "Mark read: Follow up item" }));
+  await waitFor(() => expect(panel.getByRole("button", { name: "Delete: Follow up item" })).toBeEnabled());
+  fireEvent.click(panel.getByRole("button", { name: "Delete: Follow up item" }));
+
+  await waitFor(() => {
+    expect(post).toHaveBeenCalledWith("/api/v1/feed/wywa-1/delete");
+    expect(panel.queryByText("Follow up item")).not.toBeInTheDocument();
+  });
+});
+
+it("deletes the read messages in the selected topic", async () => {
+  render(
+    <MemoryRouter initialEntries={["/?q=follow"]}>
+      <HomePage />
+    </MemoryRouter>
+  );
+
+  const notifications = document.getElementById("notifications");
+  if (!notifications) throw new Error("Notifications panel was not rendered");
+  const panel = within(notifications);
+  fireEvent.click(await panel.findByRole("button", { name: "Mark read: Follow up item" }));
+  fireEvent.click(panel.getByRole("button", { name: "Impact" }));
+  fireEvent.click(await panel.findByRole("button", { name: "Delete read" }));
+
+  await waitFor(() => {
+    expect(post).toHaveBeenCalledWith("/api/v1/feed/delete-read?chip=Impact&q=follow");
+    expect(panel.queryByText("Follow up item")).not.toBeInTheDocument();
+  });
+});

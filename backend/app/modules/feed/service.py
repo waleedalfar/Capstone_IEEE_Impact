@@ -3,7 +3,7 @@ fed by the other modules' domain events (D-38), with While You Were Away (D-39) 
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from ... import db, policies
@@ -54,18 +54,29 @@ def _item(r) -> FeedItem:
                     createdAt=r.created_at, readAt=r.read_at)
 
 
-async def list_feed(user_id: str, chip: str | None, unread: bool, query: str | None, before: str | None, limit: int = 30) -> dict:
-    q = select(notifications).where(notifications.c.user_id == user_id)
+def _matching(stmt, user_id: str, chip: str | None, query: str | None):
+    """Scope a select or delete to one user, and to a Home chip or search when those are set.
+
+    Returns None when `chip` isn't one of the Home chips, so the caller lists or deletes nothing.
+    """
+    stmt = stmt.where(notifications.c.user_id == user_id)
     if chip:
         cats = categories(chip)
         if cats is None:
-            return {"items": [], "unread": 0}
-        q = q.where(notifications.c.category.in_(cats))
-    if unread:
-        q = q.where(notifications.c.read_at.is_(None))
+            return None
+        stmt = stmt.where(notifications.c.category.in_(cats))
     if query:
         like = f"%{query.strip()[:80]}%"
-        q = q.where((notifications.c.title.ilike(like)) | (notifications.c.body.ilike(like)) | (notifications.c.category.ilike(like)))
+        stmt = stmt.where((notifications.c.title.ilike(like)) | (notifications.c.body.ilike(like)) | (notifications.c.category.ilike(like)))
+    return stmt
+
+
+async def list_feed(user_id: str, chip: str | None, unread: bool, query: str | None, before: str | None, limit: int = 30) -> dict:
+    q = _matching(select(notifications), user_id, chip, query)
+    if q is None:
+        return {"items": [], "unread": 0}
+    if unread:
+        q = q.where(notifications.c.read_at.is_(None))
     if before:
         q = q.where(notifications.c.created_at < before)
     async with db.read() as c:
@@ -81,6 +92,27 @@ async def mark(user_id: str, item_id: str | None, read: bool) -> None:
         q = q.where(notifications.c.id == item_id)
     async with db.tx() as c:
         await c.execute(q.values(read_at=func.now() if read else None))
+
+
+async def delete_item(user_id: str, item_id: str) -> str:
+    """Delete one of this user's read notifications. 'missing', 'unread', or 'deleted'."""
+    owned = (notifications.c.user_id == user_id) & (notifications.c.id == item_id)
+    async with db.tx() as c:
+        deleted = (await c.execute(delete(notifications).where(owned, notifications.c.read_at.is_not(None)).returning(notifications.c.id))).first()
+        if deleted:
+            return "deleted"
+        exists = (await c.execute(select(notifications.c.id).where(owned))).first()
+    return "unread" if exists else "missing"
+
+
+async def delete_read(user_id: str, chip: str | None, query: str | None) -> int:
+    """Delete this user's read notifications, limited to the same chip and search as the list they are looking at."""
+    q = _matching(delete(notifications).where(notifications.c.read_at.is_not(None)), user_id, chip, query)
+    if q is None:
+        return 0
+    async with db.tx() as c:
+        rows = (await c.execute(q.returning(notifications.c.id))).all()
+    return len(rows)
 
 
 async def event_context(user_id: str, last_seen, previous_seen) -> EventContext:
