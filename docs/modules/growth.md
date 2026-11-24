@@ -9,7 +9,7 @@
 - A career catalog: data analyst, software engineer, UX designer and cybersecurity, each with a skill list and core flags.
 - 7 hand-written moves, all for data analysts.
 - 7 opportunities with tiers.
-- Evidence submission (link, file or text). PDF, DOCX and TXT text is extracted.
+- Evidence submission (link, file or text). Text is extracted from PDF, Word, PowerPoint (.pptx), Excel (.xlsx) and TXT files; images are scored on the written summary.
 - A Gemini rubric (relevance, completeness, quality, clarity) with retries.
 - **Simulated** peer reviewers.
 - A points ledger with effort (weekly cap) and validated points, decay, tiers with gates, role tier, unlocks and computed badges.

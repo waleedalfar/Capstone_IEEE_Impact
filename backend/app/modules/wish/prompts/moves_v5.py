@@ -5,7 +5,7 @@ style example and no worked paths (D-29)."""
 from ..vocab import ARCHETYPES, DOMAINS, FOCUSES, FORMATS
 from .text import MOVES_SYSTEM, STYLE_EXAMPLE
 
-PROMPT_VERSION = "moves.v5"
+PROMPT_VERSION = "moves.v6"  # v6 2026-11-23: engineering audience, any discipline
 MOVES_TEMPERATURE = 0.8
 ACTIVITY_TYPES = ("explore", "create", "test", "share", "connect", "enable")
 DIFFICULTIES = ("easy", "moderate", "hard")

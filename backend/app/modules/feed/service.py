@@ -14,7 +14,8 @@ from .tables import notifications
 
 log = logging.getLogger("impact.feed")
 SOURCE = {"ProfileUpdated": "profile", "MoveSelected": "wish", "NextMoveReady": "wish", "InvitationCreated": "social",
-          "InvitationAccepted": "social", "InvitationDeclined": "social", "FeedbackSubmitted": "social"}
+          "InvitationAccepted": "social", "InvitationDeclined": "social", "FeedbackSubmitted": "social",
+          "ConnectionRequested": "social", "ConnectionAccepted": "social"}
 
 
 async def on_event(ev: DomainEvent) -> None:
@@ -23,7 +24,8 @@ async def on_event(ev: DomainEvent) -> None:
     if rule is None:
         return
     refs = ev.refs
-    source_id = next((refs.get(k) for k in ("evidenceId", "selectedMoveId", "invitationId", "wishId", "opportunityId") if refs.get(k)), None)
+    source_id = next((refs.get(k) for k in ("evidenceId", "selectedMoveId", "invitationId", "connectionId", "wishId", "opportunityId")
+                      if refs.get(k)), None)
     if ev.name == "NextMoveReady":
         key = f"next:{refs.get('wishId')}:{refs.get('step')}"
     elif ev.name in ("TierReached",):

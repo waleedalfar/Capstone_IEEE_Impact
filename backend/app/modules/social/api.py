@@ -6,6 +6,11 @@ async def is_accepted_buddy(user_id: str, selected_move_id: str) -> bool:
     return await service.is_accepted_buddy(user_id, selected_move_id)
 
 
+async def can_view_evidence(user_id: str, evidence_id: str, selected_move_id: str | None) -> bool:
+    """Accepted buddy on the evidence's move, or on that piece of past-work evidence."""
+    return await service.can_view_evidence(user_id, evidence_id, selected_move_id)
+
+
 async def counting_reviews(evidence_ids: list[str]) -> dict[str, list[tuple]]:
     """{evidence_id: [(reviewer tier, rating, confirmed, comment)]} for reviews that count toward points."""
     return await service.counting_reviews(evidence_ids)

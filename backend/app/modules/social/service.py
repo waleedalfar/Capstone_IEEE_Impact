@@ -1,6 +1,7 @@
 """Module 4: Human Roles & Social Support (owner Michael Hawes). docs/modules/social.md. mike-branch's invite rules
 (invite -> accept/decline, only the accepted buddy sees the work and leaves feedback, no self-invite, no re-invite),
-now on a selected move (D-32) with reviewer and tester roles (D-30). A counting review becomes SocialEvidence v0.1."""
+now on a selected move (D-32) with reviewer and tester roles (D-30), or on one piece of past-work evidence (evidence
+logged against a wish, not a move). A counting review becomes SocialEvidence v0.1."""
 import logging
 from datetime import datetime, timezone
 
@@ -41,20 +42,63 @@ async def lookup(user_id: str, handle: str | None, email: str | None) -> list[di
     return [{"handle": f["handle"], "displayName": f["displayName"]} for f in found if f["userId"] != user_id]
 
 
-async def _accepted_count(c, selected_move_id: str, role: str) -> int:
+def _target(r) -> tuple:
+    """(column, id) an invitation row points at: its selected move, or its past-work evidence."""
+    return (invitations.c.selected_move_id, str(r.selected_move_id)) if r.selected_move_id \
+        else (invitations.c.evidence_id, str(r.evidence_id))
+
+
+async def _accepted_count(c, col, target_id: str, role: str) -> int:
     return (await c.execute(select(func.count()).select_from(invitations).where(
-        invitations.c.selected_move_id == selected_move_id, invitations.c.role == role,
-        invitations.c.status == "accepted"))).scalar()
+        col == target_id, invitations.c.role == role, invitations.c.status == "accepted"))).scalar()
 
 
-async def invite(owner_id: str, selected_move_id: str, buddy_handle: str, role: str, message: str | None) -> dict:
+async def _subject(owner_id: str, selected_move_id: str | None, evidence_id: str | None) -> dict | None:
+    """What an invitation is about, in one shape for both kinds: title, detail, status, wish, skill, career."""
+    if selected_move_id:
+        sm = await _wish().get_selected_move(selected_move_id)
+        return {"title": sm.move.title, "detail": sm.move.detail, "status": sm.status, "wishText": sm.wish.text,
+                "wishId": sm.wishId, "skillId": sm.move.skillId, "careerId": sm.move.careerId, "pastWork": False} if sm else None
+    ev = await _growth().get_own_evidence(owner_id, evidence_id) if evidence_id else None
+    if not ev:
+        return None
+    w = await _wish().get_wish_summary(owner_id, ev.get("wishId"))
+    career = (await _profile().get_professional_state(owner_id)).targetCareerId
+    summary = ev["summary"].strip().replace("\n", " ")
+    return {"title": f"Past work: {summary[:80]}{'...' if len(summary) > 80 else ''}", "detail": ev["summary"],
+            "status": ev["status"], "wishText": w["text"] if w else "", "wishId": ev.get("wishId"), "skillId": ev["skillId"],
+            "careerId": career, "pastWork": True}
+
+
+async def _evidence_for(r) -> list[dict]:
+    """The evidence a buddy on this invitation reviews: the move's evidence, or the one past-work item."""
+    if r.selected_move_id:
+        return await _growth().list_evidence(str(r.owner_id), str(r.selected_move_id))
+    ev = await _growth().get_own_evidence(str(r.owner_id), str(r.evidence_id))
+    return [ev] if ev else []
+
+
+async def invite(owner_id: str, selected_move_id: str | None, buddy_handle: str, role: str, message: str | None,
+                 evidence_id: str | None = None) -> dict:
     if role not in policies.get("BUDDY_ROLES"):
         raise SocialError(f"Role must be one of {policies.get('BUDDY_ROLES')}.")
-    sm = await _wish().get_selected_move(selected_move_id)
-    if not sm or sm.userId != owner_id:
-        raise SocialError("Move not found.", 404)
-    if sm.status in ("abandoned", "validated"):
-        raise SocialError("This move is closed.", 409)
+    if selected_move_id:
+        sm = await _wish().get_selected_move(selected_move_id)
+        if not sm or sm.userId != owner_id:
+            raise SocialError("Move not found.", 404)
+        if sm.status in ("abandoned", "validated"):
+            raise SocialError("This move is closed.", 409)
+        col, target_id, what = invitations.c.selected_move_id, selected_move_id, "move"
+    else:
+        ev = await _growth().get_own_evidence(owner_id, evidence_id) if evidence_id else None
+        if not ev:
+            raise SocialError("Evidence not found.", 404)
+        if ev["selectedMoveId"]:
+            raise SocialError("This evidence belongs to a move: invite a buddy on the move instead.", 409)
+        if ev["status"] in ("validated", "withdrawn"):
+            raise SocialError("This evidence is already final.", 409)
+        col, target_id, what = invitations.c.evidence_id, evidence_id, "evidence"
+    subject = await _subject(owner_id, selected_move_id, evidence_id)
     found = await _profile().find_user(handle=buddy_handle) or await _profile().find_user(email=buddy_handle)
     if not found:
         raise SocialError("No one with that handle or email.", 404)
@@ -63,24 +107,25 @@ async def invite(owner_id: str, selected_move_id: str, buddy_handle: str, role: 
         raise SocialError("You can't be your own buddy.")
     limit = policies.get("BUDDIES_PER_MOVE")
     async with db.tx() as c:
-        if await _accepted_count(c, selected_move_id, role) >= limit:
-            raise SocialError(f"This move already has its {role}.", 409)
-        prev = (await c.execute(select(invitations).where(invitations.c.selected_move_id == selected_move_id,
-                                                          invitations.c.buddy_id == buddy_id))).first()
+        if await _accepted_count(c, col, target_id, role) >= limit:
+            raise SocialError(f"This {what} already has its {role}.", 409)
+        prev = (await c.execute(select(invitations).where(col == target_id, invitations.c.buddy_id == buddy_id))).first()
         if prev:
             reopen = prev.status in ("declined", "revoked", "expired") and policies.get("REINVITE_AFTER_DECLINE")
             if not reopen:
-                raise SocialError("You already invited this person to this move.", 409)
+                raise SocialError(f"You already invited this person to this {what}.", 409)
             await c.execute(update(invitations).where(invitations.c.id == prev.id).values(
                 status="pending", role=role, message=message, created_at=func.now(), responded_at=None))
             inv_id = str(prev.id)
         else:
             inv_id = str((await c.execute(invitations.insert().values(
-                selected_move_id=selected_move_id, owner_id=owner_id, buddy_id=buddy_id, role=role, message=message,
+                selected_move_id=selected_move_id, evidence_id=None if selected_move_id else evidence_id,
+                owner_id=owner_id, buddy_id=buddy_id, role=role, message=message,
             ).returning(invitations.c.id))).scalar_one())
         cards = await _profile().handle_cards([owner_id])
         bus.publish(DomainEvent(name="InvitationCreated", userId=buddy_id, refs={
-            "invitationId": inv_id, "selectedMoveId": selected_move_id, "role": role, "moveTitle": sm.move.title,
+            "invitationId": inv_id, "selectedMoveId": selected_move_id, "pastWorkEvidenceId": None if selected_move_id else evidence_id,
+            "role": role, "moveTitle": subject["title"] if subject else "",
             "ownerName": cards.get(owner_id, {}).get("displayName", "Someone")}))
     return (await list_invitations(owner_id, "sent", only=inv_id))[0]
 
@@ -95,13 +140,12 @@ async def list_invitations(user_id: str, box: str, only: str | None = None) -> l
     cards = await _profile().handle_cards(list({str(r.owner_id) for r in rows} | {str(r.buddy_id) for r in rows}))
     out = []
     for r in rows:
-        sm = await _wish().get_selected_move(str(r.selected_move_id))
+        sub = await _subject(str(r.owner_id), _sid(r.selected_move_id), _sid(r.evidence_id))
         out.append({
-            "id": str(r.id), "selectedMoveId": str(r.selected_move_id), "role": r.role, "status": r.status,
-            "message": r.message, "createdAt": r.created_at, "respondedAt": r.responded_at,
+            "id": str(r.id), "selectedMoveId": _sid(r.selected_move_id), "evidenceId": _sid(r.evidence_id), "role": r.role,
+            "status": r.status, "message": r.message, "createdAt": r.created_at, "respondedAt": r.responded_at,
             "owner": cards.get(str(r.owner_id)), "buddy": cards.get(str(r.buddy_id)),
-            "move": {"title": sm.move.title, "detail": sm.move.detail, "status": sm.status, "wishText": sm.wish.text,
-                     "skillId": sm.move.skillId} if sm else None,
+            "move": {k: sub[k] for k in ("title", "detail", "status", "wishText", "skillId", "pastWork")} if sub else None,
         })
     return out
 
@@ -116,8 +160,8 @@ async def respond(user_id: str, invitation_id: str, action: str) -> dict:
                 raise SocialError("Invitation not found.", 404)
             if r.status != "pending":
                 raise SocialError("This invitation was already answered.", 409)
-            if action == "accept" and await _accepted_count(c, str(r.selected_move_id), r.role) >= policies.get("BUDDIES_PER_MOVE"):
-                raise SocialError(f"This move already has its {r.role}.", 409)
+            if action == "accept" and await _accepted_count(c, *_target(r), r.role) >= policies.get("BUDDIES_PER_MOVE"):
+                raise SocialError(f"This {'move' if r.selected_move_id else 'evidence'} already has its {r.role}.", 409)
             status = "accepted" if action == "accept" else "declined"
         elif action == "revoke":
             if str(r.owner_id) != user_id:
@@ -129,12 +173,13 @@ async def respond(user_id: str, invitation_id: str, action: str) -> dict:
             raise SocialError("Unknown action.")
         await c.execute(update(invitations).where(invitations.c.id == invitation_id).values(status=status, responded_at=func.now()))
         if status in ("accepted", "declined"):
-            sm = await _wish().get_selected_move(str(r.selected_move_id))
+            sub = await _subject(str(r.owner_id), _sid(r.selected_move_id), _sid(r.evidence_id))
             cards = await _profile().handle_cards([user_id])
             bus.publish(DomainEvent(name="InvitationAccepted" if status == "accepted" else "InvitationDeclined",
                                     userId=str(r.owner_id), refs={
-                                        "invitationId": invitation_id, "selectedMoveId": str(r.selected_move_id), "role": r.role,
-                                        "moveTitle": sm.move.title if sm else "", "wishId": sm.wishId if sm else None,
+                                        "invitationId": invitation_id, "selectedMoveId": _sid(r.selected_move_id),
+                                        "pastWorkEvidenceId": _sid(r.evidence_id), "role": r.role,
+                                        "moveTitle": sub["title"] if sub else "", "wishId": sub["wishId"] if sub else None,
                                         "buddyName": cards.get(user_id, {}).get("displayName", "Your buddy")}))
     return {"id": invitation_id, "status": status}
 
@@ -144,6 +189,18 @@ async def is_accepted_buddy(user_id: str, selected_move_id: str) -> bool:
         return bool((await c.execute(select(invitations.c.id).where(
             invitations.c.selected_move_id == selected_move_id, invitations.c.buddy_id == user_id,
             invitations.c.status == "accepted"))).first())
+
+
+async def can_view_evidence(user_id: str, evidence_id: str, selected_move_id: str | None) -> bool:
+    """An accepted buddy on the evidence's move, or on that piece of past-work evidence itself."""
+    col, target = (invitations.c.selected_move_id, selected_move_id) if selected_move_id else (invitations.c.evidence_id, evidence_id)
+    async with db.read() as c:
+        return bool((await c.execute(select(invitations.c.id).where(
+            col == target, invitations.c.buddy_id == user_id, invitations.c.status == "accepted"))).first())
+
+
+def _sid(v) -> str | None:
+    return str(v) if v else None
 
 
 async def review_queue(user_id: str) -> list[dict]:
@@ -156,11 +213,12 @@ async def review_queue(user_id: str) -> list[dict]:
     out = []
     owners = await _profile().handle_cards(list({str(i.owner_id) for i in invs}))
     for i in invs:
-        evs = await _growth().list_evidence(str(i.owner_id), str(i.selected_move_id))
+        evs = await _evidence_for(i)
         latest = next((e for e in evs if e["status"] not in ("withdrawn", "scoring", "ai_error")), None)
-        sm = await _wish().get_selected_move(str(i.selected_move_id))
-        out.append({"invitationId": str(i.id), "role": i.role, "selectedMoveId": str(i.selected_move_id),
-                    "owner": owners.get(str(i.owner_id)), "move": {"title": sm.move.title, "detail": sm.move.detail} if sm else None,
+        sub = await _subject(str(i.owner_id), _sid(i.selected_move_id), _sid(i.evidence_id))
+        out.append({"invitationId": str(i.id), "role": i.role, "selectedMoveId": _sid(i.selected_move_id),
+                    "owner": owners.get(str(i.owner_id)),
+                    "move": {"title": sub["title"], "detail": sub["detail"], "pastWork": sub["pastWork"]} if sub else None,
                     "evidence": latest, "needsFeedback": bool(latest) and (str(i.id), latest["id"]) not in given})
     return out
 
@@ -179,7 +237,7 @@ async def submit_feedback(user_id: str, invitation_id: str, evidence_id: str | N
         raise SocialError("You can't review your own move.", 403)
     if str(inv.buddy_id) != user_id or inv.status != "accepted":
         raise SocialError("Only the accepted buddy can leave feedback.", 403)
-    evs = await _growth().list_evidence(str(inv.owner_id), str(inv.selected_move_id))
+    evs = await _evidence_for(inv)
     target = next((e for e in evs if e["id"] == evidence_id), None) if evidence_id else (evs[0] if evs else None)
     if inv.role == "reviewer":
         if not target:
@@ -189,7 +247,7 @@ async def submit_feedback(user_id: str, invitation_id: str, evidence_id: str | N
     elif not body.strip():
         raise SocialError("Write what you found when you tried it.")
     counts = inv.role == "reviewer" or (inv.role == "tester" and policies.get("TESTER_COUNTS") and rating is not None)
-    sm = await _wish().get_selected_move(str(inv.selected_move_id))
+    sub = await _subject(str(inv.owner_id), _sid(inv.selected_move_id), _sid(inv.evidence_id))
     se_contract = None
     async with db.tx() as c:
         if target and (await c.execute(select(feedback.c.id).where(feedback.c.invitation_id == invitation_id,
@@ -199,8 +257,8 @@ async def submit_feedback(user_id: str, invitation_id: str, evidence_id: str | N
             invitation_id=invitation_id, author_id=user_id, evidence_id=target["id"] if target else None, rating=rating,
             confirms=confirms, body=body.strip()).returning(feedback.c.id))).scalar_one())
         if target:
-            tier = await _growth().reviewer_tier(user_id, sm.move.careerId if sm else None)
-            se = SocialEvidence(id=fb_id, invitationId=invitation_id, evidenceId=target["id"], selectedMoveId=str(inv.selected_move_id),
+            tier = await _growth().reviewer_tier(user_id, sub["careerId"] if sub else None)
+            se = SocialEvidence(id=fb_id, invitationId=invitation_id, evidenceId=target["id"], selectedMoveId=_sid(inv.selected_move_id),
                                 ownerId=str(inv.owner_id), reviewerId=user_id, reviewerRole=inv.role, reviewerTier=tier,
                                 rating=rating, confirmed=confirms, comment=body.strip()[:1000], countsTowardPoints=bool(counts),
                                 createdAt=datetime.now(timezone.utc))
@@ -219,14 +277,28 @@ async def submit_feedback(user_id: str, invitation_id: str, evidence_id: str | N
     return {"id": fb_id, "socialEvidence": se_contract.model_dump(mode="json") if se_contract else None}
 
 
-async def feedback_for_move(user_id: str, selected_move_id: str) -> list[dict]:
+async def feedback_for_move(user_id: str, selected_move_id: str) -> dict:
     sm = await _wish().get_selected_move(selected_move_id)
     if not sm or (sm.userId != user_id and not await is_accepted_buddy(user_id, selected_move_id)):
         raise SocialError("not found", 404)
+    return await _feedback_on(invitations.c.selected_move_id, selected_move_id)
+
+
+async def feedback_for_evidence(user_id: str, evidence_id: str) -> dict:
+    """Buddies and feedback on one piece of past-work evidence (owner or its accepted buddy)."""
+    owner = await _growth().evidence_owner(evidence_id)
+    if not owner or owner[1] is not None:
+        raise SocialError("not found", 404)
+    if owner[0] != user_id and not await can_view_evidence(user_id, evidence_id, None):
+        raise SocialError("not found", 404)
+    return await _feedback_on(invitations.c.evidence_id, evidence_id)
+
+
+async def _feedback_on(col, target_id: str) -> dict:
     async with db.read() as c:
         rows = (await c.execute(select(feedback, invitations.c.role).join(invitations, invitations.c.id == feedback.c.invitation_id)
-                                .where(invitations.c.selected_move_id == selected_move_id).order_by(feedback.c.created_at))).all()
-        invs = (await c.execute(select(invitations).where(invitations.c.selected_move_id == selected_move_id,
+                                .where(col == target_id).order_by(feedback.c.created_at))).all()
+        invs = (await c.execute(select(invitations).where(col == target_id,
                                                           invitations.c.status.in_(("pending", "accepted"))))).all()
     cards = await _profile().handle_cards(list({str(r.author_id) for r in rows} | {str(i.buddy_id) for i in invs}))
     return {

@@ -11,6 +11,7 @@ const Callback = lazy(() => import("@/modules/auth/Callback"));
 const ResetPassword = lazy(() => import("@/modules/auth/ResetPassword"));
 const Onboarding = lazy(() => import("@/modules/profile/Onboarding"));
 const ProfilePage = lazy(() => import("@/modules/profile/ProfilePage"));
+const SettingsPage = lazy(() => import("@/modules/profile/SettingsPage"));
 const HomePage = lazy(() => import("@/modules/feed/HomePage"));
 const MovesPage = lazy(() => import("@/modules/wish/MovesPage"));
 const NewWish = lazy(() => import("@/modules/wish/NewWish"));
@@ -19,6 +20,7 @@ const GrowthPage = lazy(() => import("@/modules/growth/GrowthPage"));
 const EvidencePage = lazy(() => import("@/modules/growth/EvidencePage"));
 const BuddiesPage = lazy(() => import("@/modules/social/BuddiesPage"));
 const ReviewPage = lazy(() => import("@/modules/social/ReviewPage"));
+const PersonPage = lazy(() => import("@/modules/social/PersonPage"));
 const AdminPage = lazy(() => import("@/admin/AdminPage"));
 
 function Loading() {
@@ -55,6 +57,7 @@ export function App() {
               <Route path="/admin" element={<BareShell><AdminPage /></BareShell>} />
               <Route path="/" element={<Shell><HomePage /></Shell>} />
               <Route path="/profile" element={<Shell><ProfilePage /></Shell>} />
+              <Route path="/settings" element={<Shell><SettingsPage /></Shell>} />
               <Route path="/moves" element={<Shell><MovesPage /></Shell>} />
               <Route path="/moves/new" element={<Shell><NewWish /></Shell>} />
               <Route path="/moves/:wishId" element={<Shell><WishPage /></Shell>} />
@@ -62,6 +65,7 @@ export function App() {
               <Route path="/growth/evidence/:id" element={<Shell><EvidencePage /></Shell>} />
               <Route path="/buddies" element={<Shell><BuddiesPage /></Shell>} />
               <Route path="/buddies/review/:invitationId" element={<Shell><ReviewPage /></Shell>} />
+              <Route path="/people/:handle" element={<Shell><PersonPage /></Shell>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>

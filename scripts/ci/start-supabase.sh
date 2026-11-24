@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CI: start local Supabase with only the services the tests use, retrying image pulls, then write .env.local.
-# Kept: Postgres, Auth (gotrue), Storage, PostgREST, Kong (the :54321 gateway) and Mailpit (magic-link emails for e2e).
+# Kept: Postgres, Auth (gotrue), Storage, PostgREST, Kong (the :54321 gateway) and Mailpit (auth emails).
 set -euo pipefail
 EXCLUDE="realtime,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor"
 for attempt in 1 2 3; do

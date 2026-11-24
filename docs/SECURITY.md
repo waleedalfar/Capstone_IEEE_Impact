@@ -3,7 +3,7 @@
 This file covers what protects the integrated app and the risks that are left. The previous Wish Engine version is in `docs/wish-engine/SECURITY.md`.
 
 ## Identity
-- **Users.** Supabase Auth handles sign-up and sign-in with email and password, magic link or Google. Supabase handles password hashing, email confirmation and password reset. No module keeps passwords anymore:
+- **Users.** Supabase Auth handles sign-up and sign-in with email and password, or Google. Supabase handles password hashing and password reset. Email confirmation is off in production (docs/DEPLOY.md), so an account's email address is not proven. No module keeps passwords anymore:
   - Growth-Validation's bcrypt/JWT users are removed;
   - mike-branch's PBKDF2 users and sessions are removed.
 - **Token check.** Every `/api/v1` call carries the Supabase access token. FastAPI verifies it with Supabase's public keys (JWKS, ES256/RS256), with the legacy HS256 secret as a fallback (T-04). It checks:
@@ -77,8 +77,9 @@ Details in [CI_CD.md](CI_CD.md).
   - GitHub Actions are pinned to full commit SHAs, and each workflow gets only the permissions it uses.
   - Dependabot proposes updates only for releases at least 14 days old.
 - **Deploys:**
-  - Only commits that passed every check deploy, and each deploy targets that exact commit.
-  - Production needs an approval.
+  - Deploys are started by hand (typing `deploy`) by someone with write access, and only for a commit that passed CI;
+    each deploy targets that exact commit.
+  - Anyone with write access can push to `main` and deploy, so give write access only to the team.
   - Deploy secrets live in GitHub environments, scoped to their branch.
 
 ## Known risks (accepted for now)

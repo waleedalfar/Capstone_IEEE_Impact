@@ -1,4 +1,4 @@
-/* Module 4 on a move: invite a reviewer or tester (D-30, D-32), see their feedback. mike-branch's rules apply on the
+/* Module 4 on a move, or on one piece of past-work evidence: invite a reviewer or tester (D-30, D-32), see their feedback. mike-branch's rules apply on the
    server: no self-invite, no re-invite, one accepted buddy per role. BUDDY_DISCOVERY (D-35): exact = type the exact
    handle or email; search = mike-branch's "Find user by username": matches appear as you type, each with an Invite button. */
 import { useEffect, useState } from "react";
@@ -12,7 +12,9 @@ import type { Person } from "@/lib/types";
 type Fb = { id: string; role: string; rating: number | null; confirms: boolean | null; body: string; author: Person | null; createdAt: string };
 type Bud = { invitationId: string; role: string; status: string; buddy: Person | null };
 
-export function BuddyPanel({ selectedMoveId, open }: { selectedMoveId: string; open: boolean }) {
+type Target = { selectedMoveId: string; evidenceId?: undefined } | { evidenceId: string; selectedMoveId?: undefined };
+
+export function BuddyPanel({ selectedMoveId, evidenceId, open }: Target & { open: boolean }) {
   const { policy } = useConfig();
   const roles: string[] = policy("BUDDY_ROLES") ?? ["reviewer", "tester"];
   const [data, setData] = useState<{ feedback: Fb[]; buddies: Bud[] } | null>(null);
@@ -23,8 +25,9 @@ export function BuddyPanel({ selectedMoveId, open }: { selectedMoveId: string; o
   const [busy, setBusy] = useState(false);
   const searching = policy("BUDDY_DISCOVERY") === "search";
   const [found, setFound] = useState<Person[] | null>(null);
-  const load = () => get<{ feedback: Fb[]; buddies: Bud[] }>(`/api/v1/selected-moves/${selectedMoveId}/feedback`).then(setData).catch(() => {});
-  useEffect(() => { void load(); }, [selectedMoveId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const feedbackUrl = evidenceId ? `/api/v1/evidence/${evidenceId}/feedback` : `/api/v1/selected-moves/${selectedMoveId}/feedback`;
+  const load = () => get<{ feedback: Fb[]; buddies: Bud[] }>(feedbackUrl).then(setData).catch(() => {});
+  useEffect(() => { void load(); }, [feedbackUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const q = who.trim().replace(/^@/, "");
@@ -37,7 +40,7 @@ export function BuddyPanel({ selectedMoveId, open }: { selectedMoveId: string; o
   const invite = async (buddy = who.trim().replace(/^@/, "")) => {
     setBusy(true); setError(null);
     try {
-      await post("/api/v1/invitations", { selectedMoveId, buddy, role, message: msg.trim() || undefined });
+      await post("/api/v1/invitations", { ...(evidenceId ? { evidenceId } : { selectedMoveId }), buddy, role, message: msg.trim() || undefined });
       track("buddy_invited", { role, via: searching && buddy !== who.trim().replace(/^@/, "") ? "search" : "typed" });
       setWho(""); setMsg(""); setFound(null); await load();
     } catch (e) { setError(e instanceof ApiError ? e.message : "Couldn't send the invite."); } finally { setBusy(false); }

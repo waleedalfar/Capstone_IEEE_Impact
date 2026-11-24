@@ -18,7 +18,7 @@ Each phase ends with `npm test` green and something to demo. Work happens on bra
 - [x] `contracts/` + schema export + snapshot test (TypeScript types are hand-written in `frontend/src/lib/types.ts`; generating them from the schemas is not set up yet)
 - [x] `llm/` moved from the Wish Engine with its tests passing; fake model gated on `ENV=test`
 - [x] import-linter boundary contracts
-- [x] Vite + React 19 app: tokens, AppShell, sign-in (password, magic link, Google), guards, `/me`
+- [x] Vite + React 19 app: tokens, AppShell, sign-in (password, Google; emailed sign-in links later removed), guards, `/me`
 - [x] Dockerfile, `render.yaml`, CI
 - **Demo:** sign up three ways and see the empty shell; the API returns 401 without a token.
 

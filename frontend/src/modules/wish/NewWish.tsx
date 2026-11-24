@@ -82,7 +82,7 @@ export default function NewWish() {
         <Panel>
           <h1 className="mb-1 text-2xl font-bold tracking-[-0.72px] text-navy">What do you want to make happen?</h1>
           <p className="mb-5 text-[15px] text-secondary">Tell us one goal. You'll get three first moves sized for this week, and you pick.</p>
-          <Field label="Your wish"><TextArea rows={3} maxLength={300} value={text} placeholder="e.g. Land a new-grad SWE offer" onChange={(e) => { setText(e.target.value); setFromChip(false); }} /></Field>
+          <Field label="Your wish"><TextArea rows={3} maxLength={300} value={text} placeholder="e.g. Land an engineering co-op" onChange={(e) => { setText(e.target.value); setFromChip(false); }} /></Field>
           {chips.length > 0 && <>
             <h2 className="mt-5 text-sm font-semibold text-navy">Popular with students</h2>
             <ChipRow>{chips.map((c) => <Chip key={c.id} on={text === c.text} onClick={() => { setText(c.text); setFromChip(true); }}>{c.text}</Chip>)}</ChipRow>

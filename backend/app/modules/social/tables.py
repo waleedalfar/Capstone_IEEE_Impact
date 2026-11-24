@@ -7,7 +7,8 @@ from ...db import Uuid, metadata, now
 invitations = Table(
     "invitations", metadata,
     Column("id", Uuid, primary_key=True, server_default=text("gen_random_uuid()")),
-    Column("selected_move_id", Uuid, nullable=False),
+    Column("selected_move_id", Uuid),  # an invitation targets a move or one piece of past-work evidence
+    Column("evidence_id", Uuid),
     Column("owner_id", Uuid, nullable=False),
     Column("buddy_id", Uuid, nullable=False),
     Column("role", Text, nullable=False),
@@ -44,5 +45,16 @@ social_evidence = Table(
     Column("counts_toward_points", Boolean, nullable=False),
     Column("contract", JSONB, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=now),
+    schema="social",
+)
+
+connections = Table(
+    "connections", metadata,
+    Column("id", Uuid, primary_key=True, server_default=text("gen_random_uuid()")),
+    Column("requester_id", Uuid, nullable=False),
+    Column("addressee_id", Uuid, nullable=False),
+    Column("status", Text, nullable=False, server_default="pending"),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=now),
+    Column("responded_at", DateTime(timezone=True)),
     schema="social",
 )

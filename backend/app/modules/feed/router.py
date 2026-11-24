@@ -44,7 +44,7 @@ async def home(user: CurrentUser = User):
     active = await wish_api.list_selected_moves(user.id, "active,evidence_submitted,awaiting_review,needs_work")
     return ok(**jsonable_encoder({
         "profileCard": {"displayName": state.displayName, "handle": state.handle, "headline": state.headline,
-                        "targetCareer": growth_api.career_name(state.targetCareerId)},
+                        "targetCareer": growth_api.career_name(state.targetCareerId) or state.targetCareerOther},
         "growthSummary": {"impact": growth.totals.impact, "validated": growth.totals.validated, "pending": growth.totals.pending,
                           "effortCounted": growth.totals.effortCounted, "roleTier": growth.roleTier,
                           "skills": [s.model_dump() for s in growth.skills], "unlocks": len(growth.unlocks)},

@@ -34,7 +34,7 @@ class Contribution(Contract):
 
 
 class ProfessionalState(Contract):
-    schemaVersion: Literal["0.1"] = "0.1"
+    schemaVersion: Literal["0.2"] = "0.2"  # 0.2: targetCareerOther (D-55)
     userId: str
     handle: str | None = None
     displayName: str = Field(default="", max_length=80)
@@ -43,6 +43,7 @@ class ProfessionalState(Contract):
     education: Education = Field(default_factory=Education)
     position: str = Field(default="", max_length=80)
     targetCareerId: str | None = None
+    targetCareerOther: str | None = Field(default=None, max_length=60)  # D-55: typed when the career isn't listed
     skills: list[Str40] = Field(default_factory=list, max_length=30)
     interests: list[Str40] = Field(default_factory=list, max_length=20)
     strengths: list[Str40] = Field(default_factory=list, max_length=10)
@@ -143,6 +144,11 @@ class Totals(Contract):
 class Gate(Contract):
     rule: str
     met: bool
+    # What the user does to meet it: earn_points | validate_items | hard_item | senior_reviewer | endorsement (0.2)
+    action: str | None = None
+    # How far along, for a progress bar: current / target in the gate's own unit (0.2)
+    current: float | None = None
+    target: float | None = None
 
 
 class SkillState(Contract):
@@ -158,6 +164,14 @@ class SkillState(Contract):
     gates: list[Gate] = Field(default_factory=list)
 
 
+class UnlockPlan(Contract):
+    """How to unlock a locked opportunity: the skill closest to its tier and that tier's gates for that skill (0.2)."""
+    skillId: str | None = None
+    skillName: str | None = None
+    currentTier: Tier | None = None
+    steps: list[Gate] = Field(default_factory=list)
+
+
 class Unlock(Contract):
     opportunityId: str
     title: str
@@ -165,11 +179,12 @@ class Unlock(Contract):
     kind: Literal["real", "seeded", "flag", "display"]
     description: str = ""
     unlockedAt: datetime | None = None
+    howToUnlock: UnlockPlan | None = None  # only on lockedOpportunities (0.2)
 
 
 class Outcome(Contract):
     evidenceId: str
-    selectedMoveId: str
+    selectedMoveId: str | None = None  # None for past-work evidence
     skillId: str
     status: str
     aiScore: float | None = None
@@ -189,7 +204,7 @@ class Badge(Contract):
 
 
 class GrowthState(Contract):
-    schemaVersion: Literal["0.1"] = "0.1"
+    schemaVersion: Literal["0.2"] = "0.2"  # 0.2: past-work evidence (null selectedMoveId), unlock plans, gate actions
     userId: str
     careerId: str | None
     rulesVersion: str
@@ -206,11 +221,11 @@ class GrowthState(Contract):
 
 # ---- SocialEvidence v0.1 (Module 4) ----------------------------------------------------------------------------
 class SocialEvidence(Contract):
-    schemaVersion: Literal["0.1"] = "0.1"
+    schemaVersion: Literal["0.2"] = "0.2"  # 0.2: selectedMoveId is null for past-work evidence
     id: str
     invitationId: str
     evidenceId: str
-    selectedMoveId: str
+    selectedMoveId: str | None = None  # None when the review was of past-work evidence
     ownerId: str
     reviewerId: str
     reviewerRole: Literal["reviewer", "tester"]

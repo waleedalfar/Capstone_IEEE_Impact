@@ -1,6 +1,7 @@
 """Module 3: Activity, Evidence & Growth (owner Christina Phan). docs/modules/growth.md, docs/SCORING.md.
-Evidence always belongs to a SelectedMove from Module 2; its skill, activity type and difficulty come from the move
-(D-11). The rubric scores first; ValidationStrategy (D-13) decides whether that is pending, final, or nothing until a
+Evidence belongs to a SelectedMove from Module 2, whose skill, activity type and difficulty it takes (D-11), or is
+past work logged against a wish: the user picks its skill and tags, and it never moves a move's status, so it can't
+open the wish's next step. The rubric scores first; ValidationStrategy (D-13) decides whether that is pending, final, or nothing until a
 buddy reviews. Points are an append-only ledger with the rules version and policy snapshot on every row."""
 import logging
 from datetime import datetime, timedelta, timezone
@@ -12,13 +13,13 @@ from ... import db, policies
 from ...contracts import DomainEvent, GrowthState, Outcome, SocialEvidence
 from ...llm.errors import LlmUnavailable
 from ...platform import bus, jobs, storage
-from ...platform.textextract import DOCX, PDF, TXT, extract_text, sniff
+from ...platform.textextract import DOCX, PDF, PPTX, TXT, XLSX, extract_text, sniff
 from . import catalog, rubric, scoring
 from .tables import endorsements, evidence, score_events, unlocks
 
 log = logging.getLogger("impact.growth")
 MAX_FILE = 10 * 1024 * 1024
-ALLOWED_FILES = {PDF: "pdf", DOCX: "docx", TXT: "txt", "image/png": "png", "image/jpeg": "jpg"}
+ALLOWED_FILES = {PDF: "pdf", DOCX: "docx", PPTX: "pptx", XLSX: "xlsx", TXT: "txt", "image/png": "png", "image/jpeg": "jpg"}
 
 
 class GrowthError(ValueError):
@@ -44,7 +45,24 @@ def _profile():
 
 def _ev_dict(r) -> dict:
     return {k: (float(v) if k in ("ai_score", "ai_confidence", "final_quality") and v is not None else v)
-            for k, v in r._mapping.items()} | {"id": str(r.id), "selected_move_id": str(r.selected_move_id)}
+            for k, v in r._mapping.items()} | {"id": str(r.id), "selected_move_id": _sid(r.selected_move_id),
+                                               "wish_id": _sid(r.wish_id)}
+
+
+def _sid(v) -> str | None:
+    return str(v) if v else None
+
+
+async def _context(e: dict):
+    """(selected move or None, title the rubric and contributions use, career id, wish id) for one evidence row."""
+    if e["selected_move_id"]:
+        sm = await _wish().get_selected_move(e["selected_move_id"])
+        if sm:
+            return sm, sm.move.title, sm.move.careerId, sm.wishId
+    user_id = str(e["user_id"])
+    w = await _wish().get_wish_summary(user_id, e.get("wish_id"))
+    career = (await _profile().get_professional_state(user_id)).targetCareerId
+    return None, f"Past work toward: {w['text']}" if w else "Past work", career, e.get("wish_id")
 
 
 # ---- reading ----------------------------------------------------------------------------------------------------
@@ -65,6 +83,10 @@ async def _inputs(user_id: str) -> scoring.GrowthInputs:
     reviews = await _social().counting_reviews([e["id"] for e in evs])
     senior = {eid: any(t in policies.scoring_rules().senior_reviewer_tiers for t, _, _, _ in rs) for eid, rs in reviews.items()}
     taxonomy = policies.get("SKILL_MODEL") == "taxonomy"
+    career = catalog.career(state.targetCareerId) if taxonomy else None
+    # Profile skills are tracked when freeform, or when the career isn't listed (D-55).
+    from .api import own_skills
+    use_own = not taxonomy or (career is None and policies.get("CAREER_OTHER"))
     outcomes = []
     for e in [e for e in evs if e["status"] in ("validated", "needs_work", "awaiting_review")][:5]:
         pts = sum(float(r["points"]) for r in ledger if r["evidence_id"] == e["id"] and r["kind"] == "validated")
@@ -75,8 +97,8 @@ async def _inputs(user_id: str) -> scoring.GrowthInputs:
                                 feedbackSummary=(e["ai_feedback"] or "")[:240] or None,
                                 buddyComment=(rv[0][3] or None) if rv else None, peerConfirmed=e["peer_confirmed"]).model_dump())
     return scoring.GrowthInputs(
-        user_id=user_id, career=catalog.career(state.targetCareerId) if taxonomy else None,
-        freeform_skills=[] if taxonomy else state.skills, ledger=ledger, evidence=evs, senior_by_evidence=senior,
+        user_id=user_id, career=career,
+        freeform_skills=own_skills(state.skills) if use_own else [], ledger=ledger, evidence=evs, senior_by_evidence=senior,
         endorsed_skills={s for s, t in ends if t == "Verified"}, unlocked=unl, opportunities=catalog.opportunities(),
         outcomes=outcomes,
     )
@@ -89,10 +111,15 @@ async def growth_state(user_id: str) -> GrowthState:
     return GrowthState(userId=user_id, catalogVersion=catalog.version(), **body)
 
 
-async def list_evidence(user_id: str, selected_move_id: str | None = None) -> list[dict]:
+async def list_evidence(user_id: str, selected_move_id: str | None = None, wish_id: str | None = None,
+                        past_work_only: bool = False) -> list[dict]:
     q = select(evidence).where(evidence.c.user_id == user_id)
     if selected_move_id:
         q = q.where(evidence.c.selected_move_id == selected_move_id)
+    if wish_id:
+        q = q.where(evidence.c.wish_id == wish_id)
+    if past_work_only:
+        q = q.where(evidence.c.selected_move_id.is_(None))
     async with db.read() as c:
         rows = (await c.execute(q.order_by(evidence.c.created_at.desc()))).all()
         ids = [r.id for r in rows]
@@ -126,13 +153,13 @@ async def add_to_profile(user_id: str, evidence_id: str) -> None:
         raise GrowthError("not found", 404)
     if r.status != "validated":
         raise GrowthError("Only validated evidence can be added to your profile.", 409)
-    sm = await _wish().get_selected_move(str(r.selected_move_id))
+    sm = await _wish().get_selected_move(str(r.selected_move_id)) if r.selected_move_id else None
     await _profile().add_verified_contribution(user_id, evidence_id, sm.move.title if sm else "Validated work", r.summary[:1000])
 
 
 def public_evidence(e: dict, points: float | None = None) -> dict:
     return {
-        "id": e["id"], "selectedMoveId": e["selected_move_id"], "revisionOf": str(e["revision_of"]) if e.get("revision_of") else None,
+        "id": e["id"], "selectedMoveId": e["selected_move_id"], "wishId": e.get("wish_id"), "revisionOf": str(e["revision_of"]) if e.get("revision_of") else None,
         "skillId": e["skill_id"], "activityType": e["activity_type"], "difficulty": e["difficulty"],
         "difficultyFinal": e["difficulty_final"], "artifactType": e["artifact_type"], "artifactUrl": e["artifact_url"],
         "fileName": e["file_name"], "hasFile": bool(e["storage_path"]), "summary": e["summary"], "status": e["status"],
@@ -161,10 +188,11 @@ async def get_evidence(user_id: str, evidence_id: str, viewer_is_buddy: bool = F
     return out
 
 
-async def owner_of(evidence_id: str) -> tuple[str, str] | None:
+async def owner_of(evidence_id: str) -> tuple[str, str | None] | None:
+    """(owner user id, selected move id or None for past-work evidence)."""
     async with db.read() as c:
         r = (await c.execute(select(evidence.c.user_id, evidence.c.selected_move_id).where(evidence.c.id == evidence_id))).first()
-    return (str(r.user_id), str(r.selected_move_id)) if r else None
+    return (str(r.user_id), _sid(r.selected_move_id)) if r else None
 
 
 async def file_url(evidence_id: str) -> str | None:
@@ -183,13 +211,29 @@ async def ledger(user_id: str) -> list[dict]:
 
 
 # ---- submitting -------------------------------------------------------------------------------------------------
-async def submit(user_id: str, selected_move_id: str, artifact_type: str, summary: str, url: str | None,
-                 file: tuple[str, bytes] | None, user_tags: dict | None = None, revision_of: str | None = None) -> dict:
-    sm = await _wish().get_selected_move(selected_move_id)
-    if not sm or sm.userId != user_id:
-        raise GrowthError("Move not found.", 404)
-    if sm.status not in ("active", "needs_work", "evidence_submitted"):
-        raise GrowthError("This move already has evidence under review or validated.", 409)
+async def submit(user_id: str, selected_move_id: str | None, artifact_type: str, summary: str, url: str | None,
+                 file: tuple[str, bytes] | None, user_tags: dict | None = None, revision_of: str | None = None,
+                 wish_id: str | None = None) -> dict:
+    """Evidence for a selected move, or (no move, a wish id) past work toward that wish."""
+    sm = None
+    if selected_move_id:
+        sm = await _wish().get_selected_move(selected_move_id)
+        if not sm or sm.userId != user_id:
+            raise GrowthError("Move not found.", 404)
+        if sm.status not in ("active", "needs_work", "evidence_submitted"):
+            raise GrowthError("This move already has evidence under review or validated.", 409)
+        wish_id = sm.wishId
+    elif not wish_id:
+        raise GrowthError("Choose the move or the wish this evidence is for.")
+    elif not await _wish().get_wish_summary(user_id, wish_id):
+        raise GrowthError("Wish not found.", 404)
+    if revision_of:
+        async with db.read() as c:
+            prev = (await c.execute(select(evidence.c.user_id, evidence.c.selected_move_id, evidence.c.wish_id)
+                                    .where(evidence.c.id == revision_of))).first()
+        if not prev or str(prev.user_id) != user_id or _sid(prev.selected_move_id) != selected_move_id \
+                or (not selected_move_id and _sid(prev.wish_id) != wish_id):
+            raise GrowthError("The evidence you're revising wasn't found.", 404)
     if artifact_type not in ("link", "file", "text"):
         raise GrowthError("artifactType must be link, file or text.")
     if not summary.strip() or len(summary) > 4000:
@@ -197,11 +241,23 @@ async def submit(user_id: str, selected_move_id: str, artifact_type: str, summar
     if artifact_type == "link" and not (url or "").startswith(("https://", "http://")):
         raise GrowthError("Add a link starting with https://.")
 
-    skill_id, activity, difficulty = sm.move.skillId, sm.move.activityType, sm.move.difficulty
-    if policies.get("MOVE_TAGS_SOURCE") == "user" and user_tags:
-        skill_id = user_tags.get("skillId") or skill_id
-        activity = user_tags.get("activityType") if user_tags.get("activityType") in rubric_types() else activity
-        difficulty = user_tags.get("difficulty") if user_tags.get("difficulty") in ("easy", "moderate", "hard") else difficulty
+    if sm:
+        skill_id, activity, difficulty = sm.move.skillId, sm.move.activityType, sm.move.difficulty
+        if policies.get("MOVE_TAGS_SOURCE") == "user" and user_tags:
+            skill_id = user_tags.get("skillId") or skill_id
+            activity = user_tags.get("activityType") if user_tags.get("activityType") in rubric_types() else activity
+            difficulty = user_tags.get("difficulty") if user_tags.get("difficulty") in ("easy", "moderate", "hard") else difficulty
+    else:
+        # Past work has no move to take tags from, so the user always sets them; the skill must be one they track.
+        tags = user_tags or {}
+        skill_id = (tags.get("skillId") or "").strip()
+        state = await _profile().get_professional_state(user_id)
+        from .api import allowed_skills
+        allowed = {s["id"] for s in await allowed_skills(user_id, state.targetCareerId, state.skills)}
+        if not skill_id or (allowed and skill_id not in allowed):
+            raise GrowthError("Choose the skill this work shows.")
+        activity = tags.get("activityType") if tags.get("activityType") in rubric_types() else "create"
+        difficulty = tags.get("difficulty") if tags.get("difficulty") in ("easy", "moderate", "hard") else "moderate"
 
     file_text, mime, fname = "", None, None
     if artifact_type == "file":
@@ -212,20 +268,22 @@ async def submit(user_id: str, selected_move_id: str, artifact_type: str, summar
             raise GrowthError("The file is larger than 10 MB.", 413)
         mime = sniff(data)
         if mime not in ALLOWED_FILES:
-            raise GrowthError("Upload a PDF, Word, text, PNG or JPEG file.")
+            raise GrowthError("Upload a PDF, Word, PowerPoint, Excel, text, PNG or JPEG file.")
         file_text = extract_text(data, mime)
 
-    await _wish().set_selected_move_status(selected_move_id, "evidence_submitted")
+    if sm:
+        await _wish().set_selected_move_status(selected_move_id, "evidence_submitted")
     async with db.tx() as c:
         ev_id = (await c.execute(evidence.insert().values(
-            user_id=user_id, selected_move_id=selected_move_id, revision_of=revision_of, skill_id=skill_id,
+            user_id=user_id, selected_move_id=selected_move_id, wish_id=wish_id, revision_of=revision_of, skill_id=skill_id,
             activity_type=activity, difficulty=difficulty, artifact_type=artifact_type,
             artifact_url=url if artifact_type == "link" else None, file_name=(fname or "")[:200] or None, file_mime=mime,
             summary=summary.strip(), status="scoring", rules_version=policies.scoring_rules().version,
         ).returning(evidence.c.id))).scalar_one()
         ev_id = str(ev_id)
         bus.publish(DomainEvent(name="EvidenceSubmitted", userId=user_id,
-                                refs={"evidenceId": ev_id, "selectedMoveId": selected_move_id, "wishId": sm.wishId}))
+                                refs={"evidenceId": ev_id, "selectedMoveId": selected_move_id, "wishId": wish_id,
+                                      "pastWork": sm is None}))
     if file:
         path = f"{user_id}/{ev_id}/{ALLOWED_FILES[mime]}"
         try:
@@ -262,10 +320,10 @@ async def run_scoring(evidence_id: str, text: str) -> None:
     if not r or r.status != "scoring":
         return
     e = _ev_dict(r)
-    sm = await _wish().get_selected_move(e["selected_move_id"])
-    skill_name = _skill_name(sm.move.careerId if sm else None, e["skill_id"])
+    sm, title, career_id, wish_id = await _context(e)
+    skill_name = _skill_name(career_id, e["skill_id"])
     try:
-        res = await rubric.score(skill_name, sm.move.title if sm else "", e["artifact_type"], e["artifact_url"], text)
+        res = await rubric.score(skill_name, title, e["artifact_type"], e["artifact_url"], text)
     except (LlmUnavailable, Exception) as ex:
         log.warning("rubric failed for %s: %s", evidence_id, ex)
         async with db.tx() as c:
@@ -277,14 +335,17 @@ async def run_scoring(evidence_id: str, text: str) -> None:
     strategy = policies.validation()
     snapshot = policies.snapshot()
     action = strategy.after_rubric()
-    if action in ("provisional", "wait"):
+    if action in ("provisional", "wait") and sm:
         await _wish().set_selected_move_status(e["selected_move_id"], "awaiting_review")
     async with db.tx() as c:
         await c.execute(update(evidence).where(evidence.c.id == evidence_id).values(
             ai_score=out["score"], ai_confidence=out["confidence"], ai_feedback=out["feedback"], ai_criteria=out["criteria"],
             ai_provider=res.backend.provider, ai_model=res.backend.model, rubric_version=rubric.RUBRIC_VERSION,
             difficulty_final=diff_final, status="ai_scored"))
-        await _award_effort(c, e["user_id"], e["selected_move_id"], evidence_id, e["skill_id"], rules, snapshot)
+        if sm or not e["revision_of"]:
+            # Past work earns effort per submission (still under the weekly cap); a revision of it doesn't earn again.
+            await _award_effort(c, e["user_id"], e["selected_move_id"], evidence_id, e["skill_id"], rules, snapshot,
+                                reason="move_done" if sm else "past_work")
         provisional = None
         if action == "provisional":
             all_ev = (await _load(str(e["user_id"])))[1]
@@ -300,7 +361,7 @@ async def run_scoring(evidence_id: str, text: str) -> None:
         bus.publish(DomainEvent(name="EvidenceScored", userId=str(e["user_id"]), refs={
             "evidenceId": evidence_id, "selectedMoveId": e["selected_move_id"], "aiScore": out["score"],
             "provisional": action == "provisional", "points": provisional, "skillId": e["skill_id"], "skillName": skill_name,
-            "wishId": sm.wishId if sm else None}))
+            "wishId": wish_id, "pastWork": sm is None}))
     if action == "final":
         await finalize(evidence_id, reviewer=None, peer_confirmed=None)
 
@@ -337,10 +398,11 @@ async def finalize(evidence_id: str, reviewer: tuple[str, int] | None, peer_conf
     q = scoring.quality(ai, e["ai_confidence"] or 0.0, r_score, rules)
     passed = q >= rules.pass_bar and not force_needs_work
     snapshot = policies.snapshot()
-    sm = await _wish().get_selected_move(e["selected_move_id"])
-    skill_name = _skill_name(sm.move.careerId if sm else None, e["skill_id"])
+    sm, title, career_id, wish_id = await _context(e)
+    skill_name = _skill_name(career_id, e["skill_id"])
     pts = None
-    await _wish().set_selected_move_status(e["selected_move_id"], "validated" if passed else "needs_work")
+    if sm:
+        await _wish().set_selected_move_status(e["selected_move_id"], "validated" if passed else "needs_work")
     async with db.tx() as c:
         if passed:
             all_ev = (await _load(user_id))[1]
@@ -354,13 +416,14 @@ async def finalize(evidence_id: str, reviewer: tuple[str, int] | None, peer_conf
             status="validated" if passed else "needs_work", final_quality=round(q, 4), peer_confirmed=peer_confirmed,
             finalized_at=func.now(), rules_version=rules.version))
         refs = {"evidenceId": evidence_id, "selectedMoveId": e["selected_move_id"], "skillId": e["skill_id"],
-                "skillName": skill_name, "points": pts, "peerConfirmed": bool(peer_confirmed), "wishId": sm.wishId if sm else None}
+                "skillName": skill_name, "points": pts, "peerConfirmed": bool(peer_confirmed), "wishId": wish_id,
+                "pastWork": sm is None}
         bus.publish(DomainEvent(name="EvidenceValidated" if passed else "EvidenceNeedsWork", userId=user_id, refs=refs))
     if passed:
-        await _after_validation(user_id, evidence_id, before, sm, e)
+        await _after_validation(user_id, evidence_id, before, title, e)
 
 
-async def _after_validation(user_id: str, evidence_id: str, before: GrowthState, sm, e: dict) -> None:
+async def _after_validation(user_id: str, evidence_id: str, before: GrowthState, title: str, e: dict) -> None:
     after = await growth_state(user_id)
     old = {s.skillId: s.tier for s in before.skills}
     async with db.tx() as c:
@@ -375,8 +438,8 @@ async def _after_validation(user_id: str, evidence_id: str, before: GrowthState,
                 if res.rowcount:
                     bus.publish(DomainEvent(name="UnlockGranted", userId=user_id, refs={
                         "opportunityId": u.opportunityId, "title": u.title, "description": u.description}))
-    if policies.get("CONTRIBUTION_FROM_EVIDENCE") == "auto" and sm:
-        await _profile().add_verified_contribution(user_id, evidence_id, sm.move.title, e["summary"][:1000])
+    if policies.get("CONTRIBUTION_FROM_EVIDENCE") == "auto":
+        await _profile().add_verified_contribution(user_id, evidence_id, title, e["summary"][:1000])
 
 
 async def apply_social_evidence(se: SocialEvidence) -> None:

@@ -112,15 +112,29 @@ def skill_tier(f: SkillFacts, pts: float, rules: ScoringRules, verified_requires
 def gates_for(next_tier: str | None, f: SkillFacts, pts: float, rules: ScoringRules, verified_requires: str) -> list[dict]:
     if not next_tier:
         return []
-    out = [{"rule": f"{rules.thresholds[next_tier]} points", "met": pts >= rules.thresholds[next_tier]}]
+    thr = rules.thresholds[next_tier]
+    out = [{"rule": f"{thr} points", "met": pts >= thr, "action": "earn_points", "current": round(min(pts, thr), 2), "target": thr}]
     if next_tier in ("Proficient", "Demonstrated", "Verified") and rules.gates_in_order or next_tier == "Proficient":
-        out.append({"rule": f"{rules.proficient_min_items} validated items", "met": f.validated_items >= rules.proficient_min_items})
+        n = rules.proficient_min_items
+        out.append({"rule": f"{n} validated items", "met": f.validated_items >= n, "action": "validate_items",
+                    "current": min(f.validated_items, n), "target": n})
     if next_tier in ("Demonstrated", "Verified"):
-        out.append({"rule": "a validated hard item", "met": f.has_hard})
-        out.append({"rule": "a reviewer at Demonstrated or above", "met": f.has_senior_reviewer})
+        out.append({"rule": "a validated hard item", "met": f.has_hard, "action": "hard_item"})
+        out.append({"rule": "a reviewer at Demonstrated or above", "met": f.has_senior_reviewer, "action": "senior_reviewer"})
     if next_tier == "Verified" and verified_requires == "admin_endorsement":
-        out.append({"rule": "an endorsement", "met": f.endorsed})
+        out.append({"rule": "an endorsement", "met": f.endorsed, "action": "endorsement"})
     return out
+
+
+def unlock_plan(op_tier: str, per_skill: list[tuple[dict, SkillFacts, float]], rules: ScoringRules,
+                verified_requires: str) -> dict:
+    """The skill closest to op_tier (highest tier, then most points) and the gates it still has to meet for op_tier."""
+    if not per_skill:
+        return {"skillId": None, "skillName": None, "currentTier": None,
+                "steps": [{"rule": f"reach {op_tier} in any skill", "met": False, "action": "earn_points"}]}
+    s, f, pts = max(per_skill, key=lambda x: (rank(x[0]["tier"]), x[2]))
+    return {"skillId": s["skillId"], "skillName": s["name"], "currentTier": s["tier"],
+            "steps": gates_for(op_tier, f, pts, rules, verified_requires)}
 
 
 def role_tier(core_tiers: list[str], rules: ScoringRules) -> str:
@@ -167,7 +181,7 @@ def compute(inp: GrowthInputs, rules: ScoringRules, *, provisional_counts: bool,
                         if r["kind"] == "provisional" and r["evidence_id"] not in finalized)
     counted, banked, impact = totals(validated_total, effort_total, rules)
 
-    skills = []
+    skills, per_skill = [], []
     for s in skill_defs:
         f = SkillFacts()
         f.points = sum(float(r["points"]) for r in inp.ledger if r["kind"] in ("validated", "reversal") and r["skill_id"] == s["id"])
@@ -188,6 +202,7 @@ def compute(inp: GrowthInputs, rules: ScoringRules, *, provisional_counts: bool,
             "progress": round(min(1.0, pts / nthr), 3) if nthr else 1.0,
             "gates": gates_for(nxt, f, pts, rules, verified_requires),
         })
+        per_skill.append((skills[-1], f, pts))
 
     tiers = [s["tier"] for s in skills]
     core = [s["tier"] for s in skills if s["core"]]
@@ -200,7 +215,7 @@ def compute(inp: GrowthInputs, rules: ScoringRules, *, provisional_counts: bool,
         elif unlock_match.unlocks(tiers, op["tier"]):
             unlocks.append({**item, "unlockedAt": None})  # earned; saved when evidence is finalised
         else:
-            locked.append(item)
+            locked.append({**item, "howToUnlock": unlock_plan(op["tier"], per_skill, rules, verified_requires)})
 
     any_validated = any(e["status"] == "validated" for e in inp.evidence)
     badges = [

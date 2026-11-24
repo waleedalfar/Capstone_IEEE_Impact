@@ -10,6 +10,7 @@ import { track } from "@/lib/track";
 import type { Evidence, Move, SelectedSummary, Wish } from "@/lib/types";
 import { EvidenceCard } from "@/modules/growth/EvidenceCard";
 import { EvidenceForm } from "@/modules/growth/EvidenceForm";
+import { LogEvidenceButton } from "@/modules/growth/LogEvidence";
 import { BuddyPanel } from "@/modules/social/BuddyPanel";
 import { MoveTags, Pick } from "./Pick";
 
@@ -113,6 +114,29 @@ function MoveBlock({ m, focus, onChange }: { m: SelectedSummary; focus: boolean;
   );
 }
 
+/** Past work logged against this wish: graded and reviewable, but it never completes or unlocks a move. */
+function PastWork({ wish }: { wish: Wish }) {
+  const [items, setItems] = useState<Evidence[] | null>(null);
+  const load = useCallback(() => get<{ evidence: Evidence[] }>(`/api/v1/evidence?wishId=${wish.id}&pastWork=true`).then((r) => setItems(r.evidence)), [wish.id]);
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (!items?.some((e) => e.status === "scoring")) return;
+    const t = setInterval(() => void load(), 2500);
+    return () => clearInterval(t);
+  }, [items, load]);
+  return (
+    <Panel>
+      <PanelTitle count={items?.length ?? 0} right={<LogEvidenceButton kind="secondary" label="Log past work" wish={{ id: wish.id, text: wish.text }} onLogged={() => void load()} />}>
+        Past work
+      </PanelTitle>
+      <p className="mb-3 text-sm text-secondary">Already did something that shows progress toward this wish? Log it here. It counts toward your skills and unlocks, and you can invite a reviewer to confirm it. Your moves stay as they are.</p>
+      {items === null ? <Skeleton className="h-16 w-full" /> : items.length === 0 ? null : (
+        <div className="flex flex-col gap-3">{items.map((e) => <EvidenceCard key={e.id} e={e} />)}</div>
+      )}
+    </Panel>
+  );
+}
+
 export default function WishPage() {
   const { wishId = "" } = useParams();
   const [params] = useSearchParams();
@@ -153,6 +177,7 @@ export default function WishPage() {
           {moves.length >= maxSteps && <p className="text-sm text-secondary">That's the full path for this wish.</p>}
         </div>
       </Panel>
+      <PastWork wish={wish} />
       {policy("SURVEY_SCREENS") === "on" && path.length >= surveyAt && <Survey wish={wish} path={path.slice(0, surveyAt)} paidShown={paidShown} />}
       {wish.status === "active" && (
         <Button kind="text" className="self-start" onClick={async () => { await post(`/api/v1/wishes/${wish.id}/status`, { status: "completed" }); void load(); }}>
