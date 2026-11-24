@@ -66,9 +66,9 @@ async function onboard(p: Page, name: string, handle: string, career: string | {
     // ---- User A: password sign-up and onboarding (Module 1)
     const a = await newPage(browser);
     await a.goto(`${base}/`);
-    await a.getByRole("heading", { name: "Sign in" }).waitFor();
-    await shot(a, "signin");
-    await a.getByRole("link", { name: "Create an account" }).click();
+    await a.getByRole("heading", { name: "Impact++", level: 1 }).waitFor();
+    await shot(a, "landing");
+    await a.getByRole("link", { name: "Get started" }).click();
     await a.getByRole("heading", { name: "Create your account" }).waitFor();
     await a.getByLabel("Email").fill(`sam-${id}@example.com`);
     await a.getByLabel("Password").fill("test-password-123");
