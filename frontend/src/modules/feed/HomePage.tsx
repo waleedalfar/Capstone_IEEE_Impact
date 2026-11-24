@@ -1,5 +1,6 @@
 /* Home (Module 5, owner JBarroqu): Event_Ecosystem's layout with real data. Left: profile, Impact Score, best next
-   move (D-40), While You Were Away (D-39), skills. Right: notifications with the chips (D-50) and read toggle. */
+   move (D-40), While You Were Away (D-39), skills. Right: notifications with the chips (D-50), read toggle,
+   and delete for messages already read. */
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { UserButton } from "@/app/AppShell";
@@ -13,7 +14,7 @@ import { LogEvidenceButton } from "@/modules/growth/LogEvidence";
 
 const CHIPS = ["People", "Opportunity", "Impact", "Growth", "Enablement", "Social"];
 
-function FeedRow({ n, onToggle, onOpen }: { n: FeedItem; onToggle: () => void; onOpen: () => void }) {
+function FeedRow({ n, onToggle, onOpen, onDelete }: { n: FeedItem; onToggle: () => void; onOpen: () => void; onDelete: () => void }) {
   const read = !!n.readAt;
   return (
     <div className={`flex min-h-[79px] w-full items-center gap-4 border-b border-black px-2.5 py-3 transition-colors hover:bg-white md:gap-[27px] ${read ? "opacity-55" : ""}`}>
@@ -23,6 +24,11 @@ function FeedRow({ n, onToggle, onOpen }: { n: FeedItem; onToggle: () => void; o
         <span className="block truncate text-secondary">{n.body}</span>
       </button>
       <time className="hidden shrink-0 text-right font-semibold text-time sm:block" dateTime={n.createdAt}>{ago(n.createdAt)}</time>
+      <button type="button" onClick={onDelete} disabled={!read} aria-label={`Delete: ${n.title}`}
+        title={read ? "Delete this message" : "Only read messages can be deleted"}
+        className="shrink-0 rounded text-xs font-semibold text-primary hover:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40">
+        Delete
+      </button>
       <button type="button" onClick={onToggle} aria-label={`${read ? "Mark unread" : "Mark read"}: ${n.title}`}
         className={`size-3 shrink-0 rounded-full border ${read ? "border-border bg-transparent" : "border-unread bg-unread"}`} />
     </div>
@@ -74,6 +80,33 @@ export default function HomePage() {
   };
   const clearWywa = (n: FeedItem) => toggle(n);
   const open = async (n: FeedItem) => { if (!n.readAt) await toggle(n, { updateUnread: items?.some((x) => x.id === n.id) ?? false }); if (n.link) nav(n.link); };
+
+  const drop = (ids: Set<string>) => {
+    setItems((xs) => xs?.filter((x) => !ids.has(x.id)) ?? null);
+    setHome((curr) => {
+      if (!curr) return curr;
+      const away = curr.eventContext.whileYouWereAway;
+      return { ...curr, eventContext: { ...curr.eventContext, whileYouWereAway: { ...away, items: away.items.filter((x) => !ids.has(x.id)) } } };
+    });
+  };
+  const restore = () => { loadFeed(); get<Home>("/api/v1/home").then(setHome); };
+  const deleteOne = async (n: FeedItem) => {
+    if (!n.readAt) return;
+    drop(new Set([n.id]));
+    try { await post(`/api/v1/feed/${n.id}/delete`); }
+    catch { restore(); }
+  };
+  const deleteRead = async () => {
+    const ids = new Set((items ?? []).filter((n) => n.readAt).map((n) => n.id));
+    if (ids.size === 0) return;
+    drop(ids);
+    const qs = new URLSearchParams();
+    if (chip) qs.set("chip", chip);
+    if (q) qs.set("q", q);
+    const suffix = qs.toString();
+    try { await post(`/api/v1/feed/delete-read${suffix ? `?${suffix}` : ""}`); }
+    catch { restore(); }
+  };
 
   const best = home?.bestNextMove;
   const wywa = home?.eventContext.whileYouWereAway;
@@ -154,7 +187,12 @@ export default function HomePage() {
           </div>
         )}
         <Panel id="notifications" className="lg:min-h-[646px]">
-          <PanelTitle as="h1" count={unread} right={unread > 0 ? <Button kind="text" className="text-xs" onClick={async () => { await post("/api/v1/feed/read-all"); loadFeed(); }}>Mark all read</Button> : undefined}>
+          <PanelTitle as="h1" count={unread} right={(unread > 0 || (items?.some((n) => n.readAt) ?? false)) ? (
+            <div className="flex items-center gap-3">
+              {(items?.some((n) => n.readAt) ?? false) && <Button kind="text" className="text-xs" onClick={() => void deleteRead()}>Delete read</Button>}
+              {unread > 0 && <Button kind="text" className="text-xs" onClick={async () => { await post("/api/v1/feed/read-all"); loadFeed(); }}>Mark all read</Button>}
+            </div>
+          ) : undefined}>
             Notifications
           </PanelTitle>
           <div className="chip-scroll flex items-center gap-2 overflow-x-auto py-2" aria-label="Notification topics">
@@ -163,7 +201,7 @@ export default function HomePage() {
           {q && <p className="mt-1 text-xs text-secondary">Matching "{q}". <Link className="text-primary" to="/">Clear</Link></p>}
           <div className="notification-list mt-2 max-h-[474px] overflow-y-auto pr-1">
             {items === null ? [0, 1, 2].map((i) => <Skeleton key={i} className="my-3 h-[60px] w-full" />)
-              : items.length ? items.map((n) => <FeedRow key={n.id} n={n} onToggle={() => toggle(n)} onOpen={() => open(n)} />)
+              : items.length ? items.map((n) => <FeedRow key={n.id} n={n} onToggle={() => toggle(n)} onOpen={() => open(n)} onDelete={() => void deleteOne(n)} />)
                 : <Empty>{chip || q ? "No notifications match your filters." : "Nothing yet. Start a wish and your updates show up here."}</Empty>}
           </div>
         </Panel>

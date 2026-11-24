@@ -68,7 +68,8 @@ def test_token_round_trip_tamper_and_expiry():
 
 ROUTES = [("GET", "/api/v1/me"), ("GET", "/api/v1/profile"), ("PUT", "/api/v1/profile"), ("GET", "/api/v1/wishes"),
           ("POST", "/api/v1/wishes"), ("POST", "/api/v1/classify"), ("POST", f"/api/v1/wishes/{SID}/options"),
-          ("GET", "/api/v1/growth"), ("POST", "/api/v1/invitations"), ("GET", "/api/v1/feed"), ("GET", "/api/v1/home")]
+          ("GET", "/api/v1/growth"), ("POST", "/api/v1/invitations"), ("GET", "/api/v1/feed"),
+          ("POST", "/api/v1/feed/delete-read"), ("POST", f"/api/v1/feed/{SID}/delete"), ("GET", "/api/v1/home")]
 
 
 @pytest.mark.parametrize("method,path", ROUTES)

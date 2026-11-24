@@ -1,9 +1,11 @@
 """Feed and Home routes (docs/API.md, Module 5)."""
+import re
+
 from fastapi import APIRouter, Request
 from fastapi.encoders import jsonable_encoder
 
 from ...platform.auth import CurrentUser, User
-from ...platform.http import ok, read_json
+from ...platform.http import UUID_RE, err, ok, read_json
 from . import next_move, service
 
 router = APIRouter(prefix="/api/v1")
@@ -26,6 +28,24 @@ async def read_item(item_id: str, req: Request, user: CurrentUser = User):
 @router.post("/feed/read-all")
 async def read_all(user: CurrentUser = User):
     await service.mark(user.id, None, True)
+    return ok()
+
+
+@router.post("/feed/delete-read")
+async def delete_read(chip: str | None = None, q: str | None = None, user: CurrentUser = User):
+    """Delete read notifications in the current list. `chip` and `q` match GET /feed, so a filtered list only clears itself."""
+    return ok(deleted=await service.delete_read(user.id, chip, q))
+
+
+@router.post("/feed/{item_id}/delete")
+async def delete_item(item_id: str, user: CurrentUser = User):
+    if re.fullmatch(UUID_RE, item_id) is None:
+        return err("not found", 404)
+    status = await service.delete_item(user.id, item_id)
+    if status == "missing":
+        return err("not found", 404)
+    if status == "unread":
+        return err("Only read notifications can be deleted.", 409)
     return ok()
 
 
