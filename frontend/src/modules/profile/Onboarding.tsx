@@ -4,6 +4,7 @@ import { useNavigate } from "react-router";
 import { Button, ErrorNote, Panel, Skeleton, SubPanel } from "@/components/ui";
 import { ApiError, get, post, put, upload } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 import { useConfig } from "@/lib/config";
 import type { ProfessionalState } from "@/lib/types";
 import { BackgroundFields, BasicsFields, ContributionsFields, emptyDraft, fromState, mergeImport, SkillsFields, toPayload, type Draft } from "./ProfileForm";
@@ -38,7 +39,7 @@ function ResumeImport({ onDraft }: { onDraft: (d: Partial<Draft>, id: string) =>
     <SubPanel className="mb-6">
       <h2 className="mb-1 text-base font-bold text-primary">Start from your resume</h2>
       <p className="mb-3 text-sm text-secondary">
-        Optional. Upload a PDF or Word file (up to {policy("RESUME_MAX_MB") ?? 5} MB) and we'll fill in a draft you can edit.
+        Optional. Upload a PDF or Word file (up to {policy("RESUME_MAX_MB") ?? 5} MB) and AI will extract information into a draft you can edit.
         Nothing is saved until you finish. The file is deleted after it's read.
       </p>
       <div className="flex flex-wrap items-center gap-3"
@@ -65,6 +66,7 @@ export default function Onboarding() {
   const [importId, setImportId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [canceling, setCanceling] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const set = (p: Partial<Draft>) => setD((x) => ({ ...x, ...p }));
 
@@ -74,6 +76,20 @@ export default function Onboarding() {
       .catch(() => {}).finally(() => setLoaded(true));
   }, []);
   useEffect(() => { if (me?.onboarded) nav("/", { replace: true }); }, [me, nav]);
+
+  const cancel = async () => {
+    if (busy || canceling) return;
+    if (!window.confirm("Cancel profile setup? Unsaved changes will be lost. You can sign in later to finish your profile.")) return;
+    setCanceling(true); setError(null);
+    try {
+      const { error } = await supabase.auth.signOut({ scope: "local" });
+      if (error) throw error;
+      nav("/auth/sign-in", { replace: true });
+    } catch {
+      setError("Could not sign out. Please try again.");
+      setCanceling(false);
+    }
+  };
 
   const finish = async () => {
     setBusy(true); setError(null);
@@ -91,7 +107,7 @@ export default function Onboarding() {
   return (
     <div className="mx-auto max-w-[820px]">
       <h1 className="mb-1 text-2xl font-bold tracking-[-0.72px] text-navy">Where are you now?</h1>
-      <p className="mb-6 text-[15px] text-secondary">Your professional state shapes every move you get. It takes about three minutes.</p>
+      <p className="mb-6 text-[15px] text-secondary">Build your profile to personalize career activity recommendations. Dropdowns offer predefined choices; text fields accept your own words.</p>
       <ol className="mb-5 grid grid-cols-5 gap-1.5" aria-label="Steps">
         {STEPS.map((s, i) => (
           <li key={s} className="flex flex-col gap-1">
@@ -115,17 +131,21 @@ export default function Onboarding() {
             <p>Strengths: {d.strengths.join(", ") || "none yet"}</p>
             <p>Growth areas: {d.growthAreas.join(", ") || "none yet"}</p>
             <p>Contributions: {d.featuredContributions.filter((c) => c.title.trim()).length}</p>
-            <p className="text-xs text-secondary">You can change all of this later on your Profile page.</p>
+            <p className="text-xs text-secondary">You can change all of this later by selecting My profile in the navigation.</p>
           </div>
         )}
         {error && <div className="mt-5"><ErrorNote>{error}</ErrorNote></div>}
         <div className="mt-6 flex justify-between gap-3">
-          <Button kind="secondary" disabled={step === 0} onClick={() => setStep((s) => s - 1)}>Back</Button>
+          <Button kind="secondary" disabled={busy || canceling || step === 0} onClick={() => setStep((s) => s - 1)}>Back</Button>
           {step < STEPS.length - 1
-            ? <Button onClick={() => setStep((s) => s + 1)}>Next</Button>
-            : <Button busy={busy} onClick={finish}>Finish and go to Home</Button>}
+            ? <Button disabled={canceling} onClick={() => setStep((s) => s + 1)}>Next</Button>
+            : <Button disabled={canceling} busy={busy} onClick={finish}>Finish and go to Home</Button>}
         </div>
         </>}
+        <div className="mt-4 border-t border-border pt-4">
+          <Button kind="secondary" disabled={busy || canceling} onClick={cancel}>{canceling ? "Signing out..." : "Cancel setup and return to login"}</Button>
+          {!loaded && error && <div className="mt-3"><ErrorNote>{error}</ErrorNote></div>}
+        </div>
       </Panel>
     </div>
   );
