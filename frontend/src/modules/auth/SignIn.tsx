@@ -5,6 +5,13 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { AuthCard, GoogleButton, OrLine } from "./AuthCard";
 
+export function signInErrorMessage(error: { code?: string; message?: string }) {
+  if (error.code === "invalid_credentials" || /invalid login credentials/i.test(error.message ?? "")) {
+    return "Email or password is incorrect. Check both fields and try again, or reset your password.";
+  }
+  return "We couldn't sign you in. Check your connection and try again.";
+}
+
 // Password sign-in only. Emailed sign-in links were removed: every email counts against Supabase's hourly email limit.
 export default function SignIn() {
   const { session } = useAuth();
@@ -21,9 +28,14 @@ export default function SignIn() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true); setError(null);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError(error.message); else nav(next);
-    setBusy(false);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) setError(signInErrorMessage(error)); else nav(next);
+    } catch (error) {
+      setError(signInErrorMessage(error instanceof Error ? { message: error.message } : {}));
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
