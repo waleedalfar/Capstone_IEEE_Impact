@@ -25,8 +25,9 @@ export function UserButton({ onClick, label = "Open profile menu" }: { onClick?:
 
 export function Logo() {
   return (
-    <Link to="/" className="relative h-[63px] w-[61px] shrink-0 overflow-hidden" aria-label="Impact++ home">
-      <img src="/icons/ieee-logo.png" alt="IEEE" className="absolute left-[-15px] top-[-25px] h-[97px] w-[252px] max-w-none" />
+    <Link to="/" className="app-brand" aria-label="Impact++ home">
+      <img src="/icons/ieee-logo.png" alt="IEEE" className="app-brand-logo" />
+      <span className="app-brand-name">Impact++</span>
     </Link>
   );
 }
@@ -168,7 +169,6 @@ export function BareShell({ children }: { children: ReactNode }) {
       <header className="theme-header sticky top-0 z-30 border-b border-white/60 bg-white/70 backdrop-blur-lg">
         <div className="mx-auto flex min-h-[104px] max-w-[1280px] items-center gap-5 px-5 py-5 lg:px-7">
           <Logo />
-          <span className="text-sm font-semibold tracking-[-0.42px] text-navy">Impact++</span>
         </div>
       </header>
       <main className="mx-auto max-w-[1210px] px-5 pb-16 pt-8 lg:px-0">{children}</main>
