@@ -110,7 +110,10 @@ Each category is shown as a 50px tinted circle with a 25px icon. Six categories 
 - `transition-shadow` on cards.
 - Smooth scroll.
 - Focus ring: `focus-visible:outline-2 outline-[--color-primary]`.
-- No dark mode.
+
+## Theme
+- Light mode is the default. Signed-in users can open **Settings** from the profile menu to switch to dark mode.
+- The choice is saved in browser storage and applied before the app renders.
 
 ## Copy
 - Written for senior ASU CS students: direct and specific.

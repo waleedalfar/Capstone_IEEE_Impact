@@ -25,8 +25,9 @@ export function UserButton({ onClick, label = "Open profile menu" }: { onClick?:
 
 export function Logo() {
   return (
-    <Link to="/" className="relative h-[63px] w-[61px] shrink-0 overflow-hidden" aria-label="Impact++ home">
-      <img src="/icons/ieee-logo.png" alt="IEEE" className="absolute left-[-15px] top-[-25px] h-[97px] w-[252px] max-w-none" />
+    <Link to="/" className="app-brand" aria-label="Impact++ home">
+      <img src="/icons/ieee-logo.png" alt="IEEE" className="app-brand-logo" />
+      <span className="app-brand-name">Impact++</span>
     </Link>
   );
 }
@@ -67,7 +68,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="page-bg min-h-dvh text-navy">
-      <header className="sticky top-0 z-30 border-b border-white/60 bg-white/70 backdrop-blur-lg">
+      <header className="theme-header sticky top-0 z-30 border-b border-white/60 bg-white/70 backdrop-blur-lg">
         <div className="mx-auto flex min-h-[104px] max-w-[1280px] items-center gap-5 px-5 py-5 lg:gap-6 lg:px-7">
           <Logo />
           <nav className="hidden items-center gap-5 text-sm tracking-[-0.42px] md:flex" aria-label="Primary">
@@ -144,6 +145,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <p className="truncate px-3 py-2 text-xs text-secondary">{me?.displayName || me?.email}{me?.handle ? ` · @${me.handle}` : ""}</p>
                 <Link to="/profile" className="block rounded-lg px-3 py-2 hover:bg-search">View profile</Link>
                 <Link to="/buddies" className="block rounded-lg px-3 py-2 hover:bg-search">Buddies and reviews</Link>
+                <Link to="/settings" className="block rounded-lg px-3 py-2 hover:bg-search">Settings</Link>
                 <button type="button" className="block w-full rounded-lg px-3 py-2 text-left hover:bg-search" onClick={async () => { await signOut(); nav("/auth/sign-in"); }}>Sign out</button>
               </div>
             )}
@@ -164,10 +166,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 export function BareShell({ children }: { children: ReactNode }) {
   return (
     <div className="page-bg min-h-dvh text-navy">
-      <header className="sticky top-0 z-30 border-b border-white/60 bg-white/70 backdrop-blur-lg">
+      <header className="theme-header sticky top-0 z-30 border-b border-white/60 bg-white/70 backdrop-blur-lg">
         <div className="mx-auto flex min-h-[104px] max-w-[1280px] items-center gap-5 px-5 py-5 lg:px-7">
           <Logo />
-          <span className="text-sm font-semibold tracking-[-0.42px] text-navy">Impact++</span>
         </div>
       </header>
       <main className="mx-auto max-w-[1210px] px-5 pb-16 pt-8 lg:px-0">{children}</main>

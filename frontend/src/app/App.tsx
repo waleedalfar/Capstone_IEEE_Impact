@@ -11,6 +11,7 @@ const Callback = lazy(() => import("@/modules/auth/Callback"));
 const ResetPassword = lazy(() => import("@/modules/auth/ResetPassword"));
 const Onboarding = lazy(() => import("@/modules/profile/Onboarding"));
 const ProfilePage = lazy(() => import("@/modules/profile/ProfilePage"));
+const SettingsPage = lazy(() => import("@/modules/profile/SettingsPage"));
 const HomePage = lazy(() => import("@/modules/feed/HomePage"));
 const MovesPage = lazy(() => import("@/modules/wish/MovesPage"));
 const NewWish = lazy(() => import("@/modules/wish/NewWish"));
@@ -21,6 +22,7 @@ const BuddiesPage = lazy(() => import("@/modules/social/BuddiesPage"));
 const ReviewPage = lazy(() => import("@/modules/social/ReviewPage"));
 const PersonPage = lazy(() => import("@/modules/social/PersonPage"));
 const AdminPage = lazy(() => import("@/admin/AdminPage"));
+const LandingPage = lazy(() => import("@/modules/public/LandingPage"));
 
 function Loading() {
   return <div className="mx-auto mt-10 flex max-w-[600px] flex-col gap-3 px-5" aria-busy="true"><Skeleton className="h-6 w-1/2" /><Skeleton className="h-4 w-3/4" /><Skeleton className="h-32 w-full" /></div>;
@@ -41,6 +43,12 @@ function Shell({ children }: { children: ReactNode }) {
   return <RequireUser><AppShell><Suspense fallback={<Loading />}>{children}</Suspense></AppShell></RequireUser>;
 }
 
+function HomeEntry() {
+  const { session, loading } = useAuth();
+  if (loading) return <Loading />;
+  return session ? <Shell><HomePage /></Shell> : <LandingPage />;
+}
+
 export function App() {
   return (
     <BrowserRouter>
@@ -54,8 +62,9 @@ export function App() {
               <Route path="/auth/reset-password" element={<BareShell><ResetPassword /></BareShell>} />
               <Route path="/onboarding" element={<RequireUser onboarding><BareShell><Onboarding /></BareShell></RequireUser>} />
               <Route path="/admin" element={<BareShell><AdminPage /></BareShell>} />
-              <Route path="/" element={<Shell><HomePage /></Shell>} />
+              <Route path="/" element={<HomeEntry />} />
               <Route path="/profile" element={<Shell><ProfilePage /></Shell>} />
+              <Route path="/settings" element={<Shell><SettingsPage /></Shell>} />
               <Route path="/moves" element={<Shell><MovesPage /></Shell>} />
               <Route path="/moves/new" element={<Shell><NewWish /></Shell>} />
               <Route path="/moves/:wishId" element={<Shell><WishPage /></Shell>} />
